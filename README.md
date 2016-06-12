@@ -17,7 +17,7 @@ We associate with each node the following information:
   - pairing_edge: The edge this node is a pairing of, if any.
   - edge_list: a list of edges that emanate from this node.
   - If the node is a blossom, we also need:
-    - subnodes_list: the list of subnodes in this blossom, in cyclic order, starting with the unpaired node
+    - subnodes_list: the list of subnodes in this blossom, in cyclic order, starting with the unpaired node, and all edges in the cycle.
     - restore_list: for each edge in edge_list, we store the subnode that this edge is was connected to before forming the blossom.
   
 Note that len(edge_list) = len(restore_list), we can align the two in one list.
@@ -33,16 +33,45 @@ Note that the tree is considered a tree of edges, not a tree of nodes! (better s
 
 Blossom algorithm requires the following operations:
 
-- grow: for all (+)/(-) vertices in the graph, increase/decrease y by dw. 
-- add: add a paired and an unpaired edge to the tree. This is done providing an unpaired edge not in the tree, and a paired edge in the tree defining the position where to add. 
+grow: for all (+)/(-) vertices in the graph, increase/decrease y by dw. Input: whole tree
+
+- add: add a paired and an unpaired edge to the tree. 
+
+This is done providing an unpaired edge not in the tree, and a paired edge in the tree defining the position where to add. 
 The unpaired edge must be incident on the (+) vertex of the paired edge.
 From the unpaired edge, the other node is found, and from the node, the other paired edge is found.
-- make blossom: create a new node ("blossom"). As input, give two paired edges in the tree whose (+) nodes should be joined. 
-Find the cycle formed by the tree and this additional edge (backtrack the first node to the root, leaving breadcrumbs, then backtrack second until
-trace found) , build a node from these. Build the edge list for this node and change the definition of all edges imanent to this node to join to the new node instead.
-Save the original nodes for each edge so that reverting is possible. By changing the edges, the tree should have changed as well.
-- expand blossom. Essentially the inverse of make_blossom. Use the restore list to restore the previous node structure. While doing so, the node must be paired, and 
+
+Later we will in this step also examine all outer edges of the newly added edge and add instructions to make them tight to the 
+instruction list.
+
+- make blossom: create a new node ("blossom"). 
+
+As input, give two paired edges in the tree whose (+) nodes should be joined.
+
+In a first step, we need to find the cycle formed by the tree and this additional edge.
+We backtrack the first node to the root, leaving breadcrumbs (forward references from parent to child).
+Then we start building the cycle, starting from e2, backtracking towards the root and adding 
+the encountered nodes to the nodes list, until we hit the trace of breadcrumbs. We
+then follow the trace in forward direction until we end at e2.  
+
+While collecting the nodes, we also use the edge list of the nodes to tag all 
+edges that are incident with one of the nodes modulo 2.
+
+We then traverse the circle a second time to build the edge list and restore list of the new node 
+(including only outer edges, using the tags generated in the previous step), and change all the edges
+to be incident with new node.
+
+Here is a problem: We don't know which of the two nodes stored in the edge is the one that must be changed. Is there anything we can do except an if clause?
+
+- expand blossom. 
+
+Essentially the inverse of make_blossom. Use the restore list to restore the previous node structure. While doing so, the node must be paired, and 
 that pairing is used to settle the pairing inside the blossom (which might be different from the incomplete pairing left behind when the blossom was formed)
+
+The input is the node and the edge matching the node. We follow the restore list and revert all edges to their previous state. At the same time,
+we follow along in the subnode list. When we encounter the matching edge of the blossom, we start toggling the matchings of
+edges of the cycle.
+
 - augment: Given an unpaired egde emanating from the tree, add it to the tree by letting x <- 1-x along the path from (including) the unpaired edge to the root of the tree. 
 The tree is then "done" and a new tree is formed.
 
