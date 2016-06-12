@@ -95,7 +95,7 @@ cdef class Graph:
 
         return index
 
-    def add_edge(self, index1, index2):
+    def add_edge(self, index1, index2, x=0):
         cdef node *n1
         cdef node *n2
         cdef edge *e
@@ -107,7 +107,7 @@ cdef class Graph:
         e.index = self.len_edges
         self.len_edges += 1
 
-        e.x = 0
+        e.x = x
         e.slack = 0
 
         e.node_plus = n1
@@ -148,6 +148,7 @@ cdef class Graph:
                  e.node_minus.index))
 
     def plot(self, ax=None):
+        cdef edge *e
         if ax is None:
             ax = plt.gca()
 
@@ -160,15 +161,19 @@ cdef class Graph:
             xs.append(self.pos_x[self.nodes[i].index])
             ys.append(self.pos_y[self.nodes[i].index])
 
-        plt.scatter(xs, ys)
+        plt.scatter(xs, ys, s=300)
 
         for i in range(self.len_edges):
-            xs = [self.pos_x[self.edges[i].node_minus.index],
-                    self.pos_x[self.edges[i].node_plus.index]]
-            ys = [self.pos_y[self.edges[i].node_minus.index],
-                    self.pos_y[self.edges[i].node_plus.index]]
+            e = &self.edges[i]
+            xs = [self.pos_x[e.node_minus.index],
+                    self.pos_x[e.node_plus.index]]
+            ys = [self.pos_y[e.node_minus.index],
+                    self.pos_y[e.node_plus.index]]
 
-            plt.plot(xs, ys, ".-k")
+            if e.x:
+                plt.plot(xs, ys, "-k", lw=2)
+            else:
+                plt.plot(xs, ys, "--k")
 
     def __dealloc__(self):
         free(self.nodes)
