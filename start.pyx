@@ -68,7 +68,7 @@ cdef class Graph:
         self.len_edges = 0
         self.len_incidence = 0
 
-    def add_vertex(self, x, y, adj_node_list):
+    def add_vertex(self, x, y):
         cdef int index
         cdef node *n
         cdef node *n2
@@ -90,37 +90,37 @@ cdef class Graph:
 
         n.n_edges = 0
         n.edge_list = &self.incidence[self.max_neighbors * index]
-        for n2_index in adj_node_list:
-
-            n2 = &self.nodes[n2_index]
-            if n2_index < index:
-                # edge should already be created, find it
-                for i in range(n2.n_edges):
-                    e = n2.edge_list[i]
-                    if e.node_minus.index == index:
-                        break
-            else:
-                # create new edge 
-                e = &self.edges[self.len_edges]
-                e.index = self.len_edges
-                self.len_edges += 1
-
-                e.slack = 0
-                e.x = 0
-
-                e.parent = NULL
-                e.breadcrumb = NULL
-
-                e.node_plus = n
-                e.node_minus = n2
-            
-            n.edge_list[n.n_edges] = e
-            n.n_edges += 1
-
         self.pos_x[index] = x
         self.pos_y[index] = y
 
         return index
+
+    def add_edge(self, index1, index2):
+        cdef node *n1
+        cdef node *n2
+        cdef edge *e
+
+        n1 = &self.nodes[index1]
+        n2 = &self.nodes[index2]
+
+        e = &self.edges[self.len_edges]
+        e.index = self.len_edges
+        self.len_edges += 1
+
+        e.x = 0
+        e.slack = 0
+
+        e.node_plus = n1
+        e.node_minus = n2
+
+        e.parent = NULL
+        e.breadcrumb = NULL
+
+        n1.edge_list[n1.n_edges] = e
+        n1.n_edges += 1
+
+        n2.edge_list[n2.n_edges] = e
+        n2.n_edges += 1
 
     def show(self):
         cdef int i, j
@@ -147,8 +147,28 @@ cdef class Graph:
                  e.node_plus.index,
                  e.node_minus.index))
 
-    def plot(self):
-        pass
+    def plot(self, ax=None):
+        if ax is None:
+            ax = plt.gca()
+
+        cdef int i
+
+        xs = []
+        ys = []
+
+        for i in range(self.len_nodes):
+            xs.append(self.pos_x[self.nodes[i].index])
+            ys.append(self.pos_y[self.nodes[i].index])
+
+        plt.scatter(xs, ys)
+
+        for i in range(self.len_edges):
+            xs = [self.pos_x[self.edges[i].node_minus.index],
+                    self.pos_x[self.edges[i].node_plus.index]]
+            ys = [self.pos_y[self.edges[i].node_minus.index],
+                    self.pos_y[self.edges[i].node_plus.index]]
+
+            plt.plot(xs, ys, ".-k")
 
     def __dealloc__(self):
         free(self.nodes)

@@ -5,9 +5,13 @@ import pytest
 @pytest.fixture()
 def triangle_graph():
     g = start.Graph()
-    g.add_vertex(0, 0, [1, 2])
-    g.add_vertex(1, 0, [0, 2])
-    g.add_vertex(0, 1, [0, 1])
+    v1 = g.add_vertex(0, 0)
+    v2 = g.add_vertex(1, 0)
+    v3 = g.add_vertex(0, 1)
+
+    g.add_edge(v1, v2)
+    g.add_edge(v1, v3)
+    g.add_edge(v2, v3)
 
     return g
 
