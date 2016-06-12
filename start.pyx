@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-from stdlib cimport malloc, free
+from libc.stdlib cimport malloc, free
 
 
 
@@ -13,13 +13,13 @@ cdef:
         int y
         int l
 
-        struct edge *pair
+        edge *pair
 
         int n_edges
-        struct edge **edge_list
+        edge **edge_list
 
         int n_subnodes
-        struct node **subnode_list
+        node **subnode_list
 
     struct edge:
         int index
@@ -27,108 +27,128 @@ cdef:
         int slack
         int x
 
-        struct node *node_plus
-        struct node *node_minus
+        node *node_plus
+        node *node_minus
 
-        struct edge *parent
+        edge *parent
 
-        struct edge *breadcrumb
+        edge *breadcrumb
 
 
 
-cdef Graph:
+cdef class Graph:
 
     cdef node *nodes
-    cdef int len_nodes
+    cdef public int len_nodes
 
     cdef edge *edges
-    cdef int len_edges
+    cdef public int len_edges
 
     cdef edge **incidence
-    cdef int len_incidence
+    cdef public int len_incidence
 
     cdef int *pos_x
     cdef int *pos_y
 
-    def __init__(self, size=256):
+    cdef public int size, max_neighbors
 
-        self.nodes = malloc(size*sizeof(node))
-        self.edges = malloc(size*sizeof(edge))
-        self.incidence = malloc(size*sizeof(*edge))
+    def __init__(self, size=256, max_neighbors=10):
 
-        self.pos_x = malloc(size*sizeof(int))
-        self.pos_y = malloc(size*sizeof(int))
+        self.size = size
+        self.max_neighbors = max_neighbors
+
+        self.nodes = <node*> malloc(size*sizeof(node))
+        self.edges = <edge*> malloc(size*sizeof(edge))
+        self.incidence = <edge**> malloc(size*max_neighbors*sizeof(edge*))
+
+        self.pos_x = <int*> malloc(size*sizeof(int))
+        self.pos_y = <int*> malloc(size*sizeof(int))
 
         self.len_nodes = 0
         self.len_edges = 0
         self.len_incidence = 0
 
-
-    def add_vertex(x, y, adj_node_list):
+    def add_vertex(self, x, y, adj_node_list):
         cdef int index
-        cdef node *n, *n2
+        cdef node *n
+        cdef node *n2
         cdef edge *e
 
         index = self.len_nodes
-        len_nodes += 1
+        self.len_nodes += 1
         
         n = &self.nodes[index]
 
-        n->index = index
-        n->y = 0
-        n->l = 0
+        n.index = index
+        n.y = 0
+        n.l = 0
 
-        n->pair = NULL
+        n.pair = NULL
 
-        n->n_subnodes = 1
-        n->subnode_list = NULL
+        n.n_subnodes = 1
+        n.subnode_list = NULL
 
+        n.n_edges = 0
+        n.edge_list = &self.incidence[self.max_neighbors * index]
         for n2_index in adj_node_list:
+
             n2 = &self.nodes[n2_index]
+            if n2_index < index:
+                # edge should already be created, find it
+                for i in range(n2.n_edges):
+                    e = n2.edge_list[i]
+                    if e.node_minus.index == index:
+                        break
+            else:
+                # create new edge 
+                e = &self.edges[self.len_edges]
+                e.index = self.len_edges
+                self.len_edges += 1
+
+                e.slack = 0
+                e.x = 0
+
+                e.parent = NULL
+                e.breadcrumb = NULL
+
+                e.node_plus = n
+                e.node_minus = n2
             
-            e = &self.edges[self.len_edges]
-            e->index = self.len_edges
-            self.len_egdes += 1
+            n.edge_list[n.n_edges] = e
+            n.n_edges += 1
 
-            e->slack = 0
-            e->x = 0
-
-            e->parent = NULL
-            e->breadcrumb = NULL
-
-            e->node_plus = n
-            e->node_minus = n2
+        self.pos_x[index] = x
+        self.pos_y[index] = y
 
         return index
 
-    def print(self):
+    def show(self):
         cdef int i, j
         cdef node *n
         cdef edge *e
 
         print("Vertices:")
 
-        for i in range(self.len_vertices):
+        for i in range(self.len_nodes):
             n = &self.nodes[i]
-            print("%d: \n   "%n->index)
-            for j in range(n->n_edges):
+            print("%d (x=%d, y=%d):\n"%(n.index, self.pos_x[n.index], self.pos_y[n.index]))
+            for j in range(n.n_edges):
                 print("   (%d, %d -- %d)"%
-                    (n->edge_list[j]->index,
-                     n->edge_list[j]->node_plus,
-                     n->edge_list[j]->node_minus))
+                    (n.edge_list[j].index,
+                     n.edge_list[j].node_plus.index,
+                     n.edge_list[j].node_minus.index))
 
 
-        print("Edges: ")
-            for i in range(self.edges):
-                e = &self.edges[i]
-                print("(%d, %d -- %d)"%
-                    (e->index,
-                     e->node_plus,
-                     e->node_minus))
+        print("Edges:")
+        for i in range(self.len_edges):
+            e = &self.edges[i]
+            print("(%d, %d -- %d)"%
+                (e.index,
+                 e.node_plus.index,
+                 e.node_minus.index))
 
-
-
-
+    def plot(self):
+        pass
 
     def __dealloc__(self):
         free(self.nodes)
