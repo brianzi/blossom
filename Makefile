@@ -3,7 +3,7 @@ PYTHON_INCLUDE=$(shell python3 -c 'import distutils.sysconfig; print(distutils.s
 CFLAGS=-I$(NUMPY_INCLUDE) -O3
 CFLAGS+= -I$(PYTHON_INCLUDE)
 
-all: start.so
+all: start.so test
 
 
 start.c: start.pyx
@@ -11,6 +11,9 @@ start.c: start.pyx
 
 start.so: start.c
 	gcc -o start.so -shared -fPIC start.c $(CFLAGS) 
+
+test:
+	py.test
 
 
 
