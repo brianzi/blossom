@@ -63,3 +63,21 @@ def test_getters(triangle_graph):
     e = g.get_edge(n["edge_list"][0])
 
     assert {e["node_plus"], e["node_minus"]} == {0, 1}
+
+def test_pair_edge(triangle_graph):
+    g = triangle_graph
+    n = g.get_node(0)
+    e = g.get_edge(n["edge_list"][0])
+
+    assert e['x'] == 0
+
+    g.pair_edge(e['index'])
+
+    e = g.get_edge(n["edge_list"][0])
+
+    assert e['x'] == 1
+
+    n = g.get_node(e['node_minus'])
+    assert n['pair'] == e['index']
+    n = g.get_node(e['node_plus'])
+    assert n['pair'] == e['index']

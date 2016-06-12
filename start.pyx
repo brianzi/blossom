@@ -228,6 +228,11 @@ cdef class Graph:
 
         r["edge_list"] = edge_list
 
+        if n.pair != NULL:
+            r["pair"] = n.pair.index
+        else:
+            r["pair"] = None
+
         return r
 
 
@@ -249,6 +254,18 @@ cdef class Graph:
             self.edges[edge_index].x = x
         if slack is not None:
             self.edges[edge_index].slack = slack
+
+    def pair_edge(self, edge_index, pair=True):
+        cdef edge *e
+        e = &self.edges[edge_index]
+        if pair:
+            e.x = 1
+            e.node_plus.pair = e
+            e.node_minus.pair = e
+        else:
+            e.x = 0
+            e.node_plus.pair = NULL
+            e.node_minus.pair = NULL
 
     def __dealloc__(self):
         free(self.nodes)
