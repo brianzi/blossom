@@ -195,10 +195,44 @@ cdef class Graph:
 
 
 
+    def get_edge(self, edge_index):
+        cdef edge *e
+        e = &self.edges[edge_index]
+        r = {
+                "index": e.index,
+                "x": e.x,
+                "slack": e.slack,
+                "node_plus": e.node_plus.index,
+                "node_minus": e.node_minus.index,
+                }
+        if e.parent != NULL:
+            r["parent"] = e.parent.index
+        else:
+            r["parent"] = None
+
+        return r
+
+    def get_node(self, node_index):
+        cdef node *n
+        cdef int i
+        n = &self.nodes[node_index]
+        r = {
+                "index": n.index,
+                "y": n.y,
+                "l": n.l
+                }
+
+        edge_list = []
+        for i in range(n.n_edges):
+            edge_list.append(n.edge_list[i].index)
+
+        r["edge_list"] = edge_list
+
+        return r
+
+
     def raw_set_root(self, root_node_index):
         self.root.node_plus = &self.nodes[root_node_index]
-
-
 
     def raw_set_parent(self, parent_index, child_index):
 

@@ -51,3 +51,15 @@ Edges:
 (1, 0 -- 2)
 (2, 1 -- 2)
 """
+
+def test_getters(triangle_graph):
+    g = triangle_graph
+
+    n = g.get_node(0)
+    assert n["index"] == 0
+    assert n["y"] == 0
+    assert len(n["edge_list"]) == 2
+
+    e = g.get_edge(n["edge_list"][0])
+
+    assert {e["node_plus"], e["node_minus"]} == {0, 1}
