@@ -50,6 +50,9 @@ cdef class Graph:
     cdef int *pos_x
     cdef int *pos_y
 
+    cdef edge **tree
+    cdef edge root
+
     cdef public int size, max_neighbors
 
     def __init__(self, size=256, max_neighbors=10):
@@ -67,6 +70,8 @@ cdef class Graph:
         self.len_nodes = 0
         self.len_edges = 0
         self.len_incidence = 0
+
+        self.root.node_plus = NULL
 
     def add_vertex(self, x, y):
         cdef int index
@@ -122,6 +127,8 @@ cdef class Graph:
         n2.edge_list[n2.n_edges] = e
         n2.n_edges += 1
 
+        return e.index
+
     def show(self):
         cdef int i, j
         cdef node *n
@@ -161,7 +168,13 @@ cdef class Graph:
             xs.append(self.pos_x[self.nodes[i].index])
             ys.append(self.pos_y[self.nodes[i].index])
 
-        plt.scatter(xs, ys, s=300)
+        plt.scatter(xs, ys, s=150, c="black")
+
+        if self.root.node_plus != NULL:
+            x = self.pos_x[self.root.node_plus.index]
+            y = self.pos_y[self.root.node_plus.index]
+
+            plt.scatter((x), (y), s=300, c="red")
 
         for i in range(self.len_edges):
             e = &self.edges[i]
@@ -170,10 +183,38 @@ cdef class Graph:
             ys = [self.pos_y[e.node_minus.index],
                     self.pos_y[e.node_plus.index]]
 
-            if e.x:
-                plt.plot(xs, ys, "-k", lw=2)
+            if e.parent != NULL:
+                color = "red"
             else:
-                plt.plot(xs, ys, "--k")
+                color = "black"
+
+            if e.x:
+                plt.plot(xs, ys, "-", lw=2, color=color)
+            else:
+                plt.plot(xs, ys, "-k", color=color)
+
+
+
+    def raw_set_root(self, root_node_index):
+        self.root.node_plus = &self.nodes[root_node_index]
+
+
+
+    def raw_set_parent(self, parent_index, child_index):
+
+        cdef edge *p
+        cdef edge *e
+
+        p = &self.edges[parent_index]
+        e = &self.edges[child_index]
+
+        e.parent = p
+
+    def raw_set_edge(self, edge_index, x=None, slack=None):
+        if x is not None:
+            self.edges[edge_index].x = x
+        if slack is not None:
+            self.edges[edge_index].slack = slack
 
     def __dealloc__(self):
         free(self.nodes)
