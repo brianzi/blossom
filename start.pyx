@@ -40,7 +40,7 @@ cdef:
 
     struct instruction:
         int instr_id
-        edge *outer_edge
+        edge *edge
 
 
 cdef void swap_nodes(edge *e):
@@ -196,7 +196,7 @@ cdef class Graph:
                  -1 if e.parent == NULL else e.parent.index,
                  -1 if e.cycle == NULL else e.cycle.index))
 
-        print([self.outer_edges[i].index for i in range(self.len_outer_edges)])
+        print([self.outer_edges[i].edge.index for i in range(self.len_outer_edges)])
 
 
 
@@ -330,8 +330,13 @@ cdef class Graph:
     cdef void add_outer_edge(self, edge *e, node *node_in_tree):
         assert node_in_tree.pair != NULL
         assert node_in_tree.pair.parent != NULL
+        cdef instruction *ins
         if e.parent == NULL:
-            self.outer_edges[self.len_outer_edges] = e
+            ins = &self.outer_edges[self.len_outer_edges]
+            ins.edge = e
+            e.instr_id += 1
+            ins.instr_id = e.instr_id
+
             self.len_outer_edges += 1
             if e.node_plus != node_in_tree:
                 swap_nodes(e)
@@ -340,7 +345,7 @@ cdef class Graph:
         cdef edge *e
         cdef edge *te
         for i in range(self.len_outer_edges):
-            e = self.outer_edges[i]
+            e = self.outer_edges[i].edge
 
             assert e.node_plus.pair != NULL
             if e.node_plus.pair != <edge*> -1:
@@ -352,9 +357,9 @@ cdef class Graph:
                 e = te.node_plus.edge_list[ei]
                 if e.parent == NULL:
                     for oi in range(self.len_outer_edges):
-                        if self.outer_edges[oi] == e:
+                        if self.outer_edges[oi].edge == e:
                             break
-                    assert self.outer_edges[oi] == e
+                    assert self.outer_edges[oi].edge == e
 
 
                 
@@ -731,6 +736,49 @@ cdef class Graph:
         e.cycle = NULL
 
 
+    def do_edge(self, edge_index):
+        cdef edge* e
+        assert edge_index < self.len_edges
+        e = &self.edges[edge_index]
+
+        if e.parent:
+            return "already in tree"
+        if e.node_plus.pair == NULL or e.node_plus.pair.parent == NULL:
+            return "not outer"
+
+        if e.node_minus.pair == NULL:
+            self.augment(edge_index)
+            self.set_root()
+            return "augment"
+        if e.node_minus.pair.parent == NULL:
+            self.grow(edge_index)
+            return "grow"
+        if e.node_minus.pair.parent != NULL:
+            self.shrink(edge_index)
+            return "shrink"
+
+
+    def pair_all(self):
+        assert self.root.node_plus == NULL
+
+        self.set_root()
+
+        ip = 0
+        while ip < self.len_outer_edges:
+            r = self.do_edge(self.outer_edges[ip].edge.index)
+            if r == "augment":
+                ip = 0
+
+            print(r)
+
+
+        
+
+
+
+
+
+
     def get_edge(self, edge_index):
         cdef edge *e
         e = &self.edges[edge_index]
@@ -784,6 +832,7 @@ cdef class Graph:
         for i in range(self.root.node_plus.n_edges):
             self.add_outer_edge(self.root.node_plus.edge_list[i], self.root.node_plus)
 
+
     def set_root(self):
         cdef node *n
 
@@ -807,7 +856,7 @@ cdef class Graph:
     def get_outer_edges(self):
         outer_edges = []
         for i in range(self.len_outer_edges):
-            outer_edges.append(self.outer_edges[i].index)
+            outer_edges.append(self.outer_edges[i].edge.index)
 
         return outer_edges
 
