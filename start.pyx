@@ -35,6 +35,13 @@ cdef:
         edge *cycle
         int tag
 
+        int instr_id
+
+
+    struct instruction:
+        int instr_id
+        edge *outer_edge
+
 
 cdef void swap_nodes(edge *e):
     cdef node *t
@@ -66,7 +73,8 @@ cdef class Graph:
     cdef edge root
 
     cdef int len_outer_edges
-    cdef edge **outer_edges
+    cdef int instruction_pointer
+    cdef instruction *outer_edges
 
     cdef public int size, max_neighbors
 
@@ -80,7 +88,7 @@ cdef class Graph:
         self.incidence = <edge**> malloc(size*max_neighbors*sizeof(edge*))
         self.tree = <edge**> malloc(size*sizeof(edge*))
         self.restore = <node**> malloc(size*sizeof(node*))
-        self.outer_edges = <edge**> malloc(size*sizeof(edge*))
+        self.outer_edges = <instruction*> malloc(size*sizeof(instruction))
 
         self.pos_x = <float*> malloc(size*sizeof(int))
         self.pos_y = <float*> malloc(size*sizeof(int))
@@ -91,6 +99,8 @@ cdef class Graph:
         self.len_tree = 0
         self.len_restore = 0
         self.len_outer_edges = 0
+
+        self.instruction_pointer = 0
 
         self.root.node_plus = NULL
         self.root.node_minus = NULL
@@ -476,7 +486,6 @@ cdef class Graph:
             e.cycle = e.parent.cycle
             unpaired_e.cycle = unpaired_e.node_minus.pair
         else:
-            print("x")
             unpaired_e.cycle = self.root.cycle
 
             
@@ -614,10 +623,9 @@ cdef class Graph:
                 e.node_plus = blossom.restore_list[i]
             else:
                 e.node_minus = blossom.restore_list[i]
-        print(3)
+        print(3.0)
 
         # re-pair blossom if necessary
-        print(blossom.pair.node_minus.pair.index)
         if blossom.pair.node_minus.pair != <edge*> -1:
             print(3.1)
             start = blossom.pair.node_minus.pair.cycle
@@ -640,18 +648,16 @@ cdef class Graph:
                 e = e.cycle.cycle
             print(3.4)
 
-            blossom.pair.node_minus.pair = blossom.pair
+        blossom.pair.node_minus.pair = blossom.pair
 
         print(4)
         # regrow the tree
-
-        
         e2 = blossom.pair.parent
 
         if (e2.node_minus.pair.cycle.node_minus == e2.node_minus or
                 e2.node_minus.pair.cycle.node_plus == e2.node_minus):
+            print("against")
             # tree grows against cycle
-
 
             # run up to the pairing node
             e = e2
@@ -689,6 +695,7 @@ cdef class Graph:
 
 
         else:
+            print("with")
             # tree grows along cycle
             while e2.node_minus.pair != blossom.pair:
                 e = e2
