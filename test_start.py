@@ -143,6 +143,63 @@ def test_bv_example_shrink():
 
     bv.shrink(m[3, 4])
 
-    bv.show()
+
+    bv.check_all()
+
+
+def test_bv_example_shrink2():
+    bv = start.Graph()
+
+    bv.add_vertex(0, 5)
+    bv.add_vertex(-1, 4)
+    bv.add_vertex(1, 4)
+    bv.add_vertex(-1, 3)
+    bv.add_vertex(1, 3)
+    bv.add_vertex(-2, 2)
+    bv.add_vertex(0, 2)
+    bv.add_vertex(-2, 1)
+    bv.add_vertex(0, 1)
+    bv.add_vertex(-2, 3)
+    bv.add_vertex(-2.5, 4)
+    bv.add_vertex(-2.5, 5)
+    bv.add_vertex(0, 6)
+    bv.add_vertex(0.5, 6)
+
+    m = {}
+    for u, v in {(0, 1), (0, 2), (1, 3), (2, 4), (3, 5), (4, 6), (5, 7),
+                 (6, 8), (3, 9), (9, 10), (10, 11), (3, 4), (0, 12), (12, 13)}:
+        idx = bv.add_edge(u, v)
+        m[u, v] = idx
+
+    r = bv.set_root()
+
+    bv.augment(bv.get_outer_edges()[0])
+
+    bv.set_root()
+
+    bv.grow(6)
+
+    bv.augment(12)
+
+    bv.set_root()
+
+    bv.grow(11)
+    bv.grow(6)
+    bv.shrink(1)
+
+    bv.augment(4)
+
+    bv.raw_set_root(5)
+    bv.grow(13)
+
+    bv.expand(14)
+
+    bv.augment(3)
+
+    bv.set_root()
+
+    bv.grow(bv.get_outer_edges()[0])
+
+    bv.augment(10)
 
     bv.check_all()
