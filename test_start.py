@@ -20,6 +20,13 @@ def test_print_empty():
     start.Graph()
 
 
+def test_set_root(triangle_graph):
+    g = triangle_graph
+
+    i = g.set_root()
+    assert i == 0
+
+
 def test_add_three_vertices(triangle_graph):
     g = triangle_graph
 

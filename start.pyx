@@ -167,7 +167,7 @@ cdef class Graph:
         for i in range(self.len_nodes):
             n = &self.nodes[i]
             print("%d (x=%g, y=%g):\n"%(n.index, self.pos_x[n.index], self.pos_y[n.index]))
-            if n.pair != NULL:
+            if n.pair != NULL and n.pair != <edge*> -1:
                 print("pair: %d"%n.pair.index)
             for j in range(n.n_edges):
                 print("   (%d, %d -- %d)"%
@@ -251,7 +251,6 @@ cdef class Graph:
         self.check_graph_integrity()
         self.check_no_tags()
         self.check_tree_integrity()
-
         self.check_outer_edges()
 
     def check_graph_integrity(self):
@@ -274,7 +273,6 @@ cdef class Graph:
         cdef edge *edge
         for ei in range(self.len_edges):
             edge = &self.edges[ei]
-            print(ei)
             assert edge.tag == 0
 
         assert self.root.tag == 0
@@ -330,11 +328,26 @@ cdef class Graph:
 
     def check_outer_edges(self):
         cdef edge *e
+        cdef edge *te
         for i in range(self.len_outer_edges):
             e = self.outer_edges[i]
 
             assert e.node_plus.pair != NULL
-            assert e.node_plus.pair.parent != NULL
+            if e.node_plus.pair != <edge*> -1:
+                assert e.node_plus.pair.parent != NULL
+
+        for ti in range(self.len_tree):
+            te = self.tree[ti]
+            for ei in range(te.node_plus.n_edges):
+                e = te.node_plus.edge_list[ei]
+                if e.parent == NULL:
+                    for oi in range(self.len_outer_edges):
+                        if self.outer_edges[oi] == e:
+                            break
+                    assert self.outer_edges[oi] == e
+
+
+                
 
     def augment(self, edge_index):
         cdef edge *unpaired_e
@@ -417,6 +430,7 @@ cdef class Graph:
         cdef edge *unpaired_e
         cdef node *blossom
         cdef edge *blossom_pair_parent
+        cdef node *lonely_node
         cdef edge *e
 
 
@@ -444,6 +458,7 @@ cdef class Graph:
 
         ### step 1: find the cycle:
 
+
         #leave breadcrumbs
         e = unpaired_e.node_plus.pair
         e.cycle = unpaired_e
@@ -452,20 +467,26 @@ cdef class Graph:
             e = e.parent
 
 
+        
         e = unpaired_e.node_minus.pair
-        while e.parent.cycle == NULL:
-            e.cycle = e.parent
-            e = e.parent
+        if e != &self.root:
+            while e.parent.cycle == NULL:
+                e.cycle = e.parent
+                e = e.parent
+            e.cycle = e.parent.cycle
+            unpaired_e.cycle = unpaired_e.node_minus.pair
+        else:
+            print("x")
+            unpaired_e.cycle = self.root.cycle
+
             
+
 
 
         blossom.pair = e.parent
         blossom_pair_parent = blossom.pair.parent
+        lonely_node = blossom.pair.node_plus
 
-        e.cycle = e.parent.cycle
-
-
-        unpaired_e.cycle = unpaired_e.node_minus.pair
 
         #all edges in the blossom now point along the cycle with parent pointers
 
@@ -482,10 +503,6 @@ cdef class Graph:
         for i in range(e.node_plus.n_edges):
             e.node_plus.edge_list[i].tag ^= 1
 
-        
-
-
-
         #run a second time to add them to the edge and restore lists and change the node ends
 
         cnt = 1
@@ -496,11 +513,8 @@ cdef class Graph:
             self.pos_y[blossom.index] += self.pos_y[e.node_plus.index]
             self.pos_x[blossom.index] += self.pos_x[e.node_minus.index]
             self.pos_y[blossom.index] += self.pos_y[e.node_minus.index]
-            print(e.index, e.node_plus.n_edges, e.node_minus.n_edges)
             for i in range(e.node_plus.n_edges):
-                print(e.node_plus.edge_list[i].index)
                 if e.node_plus.edge_list[i].tag != 0:
-                    print("plus: ", (e.node_plus.edge_list[i].index))
                     self.incidence[self.len_incidence] = e.node_plus.edge_list[i]
                     self.len_incidence += 1
                     self.restore[self.len_restore] = e.node_plus
@@ -511,13 +525,12 @@ cdef class Graph:
                         e.node_plus.edge_list[i].node_minus = blossom
                     blossom.n_edges += 1
                     e.node_plus.edge_list[i].tag = 0
+                    self.add_outer_edge(e, e.node_plus)
                     if e.node_plus.edge_list[i].parent != NULL:
                         e.node_plus.edge_list[i].parent = blossom.pair
 
             for i in range(e.node_minus.n_edges):
-                print(e.node_minus.edge_list[i].index)
                 if e.node_minus.edge_list[i].tag != 0:
-                    print("minus: ", (e.node_minus.edge_list[i].index))
                     self.incidence[self.len_incidence] = e.node_minus.edge_list[i]
                     self.len_incidence += 1
                     self.restore[self.len_restore] = e.node_minus
@@ -527,6 +540,7 @@ cdef class Graph:
                     else:
                         e.node_minus.edge_list[i].node_plus = blossom
                     blossom.n_edges += 1
+                    self.add_outer_edge(e, e.node_minus)
                     e.node_minus.edge_list[i].tag = 0
 
 
@@ -548,12 +562,16 @@ cdef class Graph:
                     e.node_plus.edge_list[i].node_minus = blossom
                 blossom.n_edges += 1
                 e.node_plus.edge_list[i].tag = 0
+                self.add_outer_edge(e, e.node_plus)
                 if e.node_plus.edge_list[i].parent != NULL:
                     e.node_plus.edge_list[i].parent = blossom.pair
 
+
         blossom.pair.node_plus = blossom
 
+
         blossom.pair.parent = blossom_pair_parent
+        lonely_node.pair = <edge*> -1
 
 
 
@@ -569,7 +587,6 @@ cdef class Graph:
             e = e.parent
         e.cycle = NULL
 
-
     def expand(self, blossom_index):
         cdef node *blossom
         cdef edge *pair
@@ -577,7 +594,7 @@ cdef class Graph:
         cdef edge *start
         cdef edge *e2
 
-
+        print(1)
 
         assert self.len_nodes > blossom_index
 
@@ -588,6 +605,7 @@ cdef class Graph:
 
         if blossom.pair.node_plus == blossom:
             swap_nodes(blossom.pair)
+        print(2)
 
         # restore graph structure
         for i in range(blossom.n_edges):
@@ -596,26 +614,35 @@ cdef class Graph:
                 e.node_plus = blossom.restore_list[i]
             else:
                 e.node_minus = blossom.restore_list[i]
+        print(3)
 
         # re-pair blossom if necessary
-        if blossom.pair.node_minus.pair != blossom.pair:
+        print(blossom.pair.node_minus.pair.index)
+        if blossom.pair.node_minus.pair != <edge*> -1:
+            print(3.1)
             start = blossom.pair.node_minus.pair.cycle
 
+            print(3.2)
 
             if start.node_plus == blossom.pair.node_minus:
+                print(3.21)
                 start = start.cycle
             if start.node_minus == blossom.pair.node_minus:
+                print(3.22)
                 start = start.cycle
 
+            print(3.3)
 
             e = start
 
             while e.cycle != start:
                 self._pair_edge(e)
                 e = e.cycle.cycle
+            print(3.4)
 
             blossom.pair.node_minus.pair = blossom.pair
 
+        print(4)
         # regrow the tree
 
         
@@ -685,6 +712,7 @@ cdef class Graph:
                 self.len_tree += 1
 
             blossom.pair.parent = e2
+        print(5)
 
         # delete cycle information
         start = blossom.cycle_start
@@ -748,6 +776,34 @@ cdef class Graph:
 
         for i in range(self.root.node_plus.n_edges):
             self.add_outer_edge(self.root.node_plus.edge_list[i], self.root.node_plus)
+
+    def set_root(self):
+        cdef node *n
+
+        assert self.root.node_plus == NULL
+
+        for i in range(self.len_nodes):
+            if self.nodes[i].pair == NULL:
+                n = &self.nodes[i]
+                break
+        else:
+            return -1
+
+        self.root.node_plus = n
+        n.pair = &self.root
+        for i in range(n.n_edges):
+            self.add_outer_edge(n.edge_list[i], n)
+
+        return n.index
+
+
+    def get_outer_edges(self):
+        outer_edges = []
+        for i in range(self.len_outer_edges):
+            outer_edges.append(self.outer_edges[i].index)
+
+        return outer_edges
+
 
     def raw_set_parent(self, parent_index, child_index):
 
