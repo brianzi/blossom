@@ -8,9 +8,9 @@ from libc.stdlib cimport malloc, free
 cdef enum:
     TAG_WORK = 1
     TAG_BLOSSOM = 2
-    TAG_MINUS_INNER = 4
-    TAG_PLUS_OUTER = 8
-    TAG_DBL_OUTER = 16
+    TAG_OUTER = 4
+    TAG_INNER = 8
+    TAG_DOUBLE = 16
 
 cdef:
     struct node:
@@ -270,7 +270,6 @@ cdef class Graph:
     def check_all(self):
         self.check_graph_integrity()
         self.check_tree_integrity()
-        
 
     def check_graph_integrity(self):
         "For all edges, check whether the nodes declared as node_plus and node_minus have edge listed as incident"
@@ -354,24 +353,14 @@ cdef class Graph:
 
             else:
 
-                if e.tag & TAG_PLUS_OUTER:
+                if e.tag & TAG_OUTER:
                     assert e.node_plus.pair != NULL
                     assert e.node_plus.pair.parent != NULL
 
 
-                if e.tag & TAG_MINUS_INNER:
+                if e.tag & TAG_INNER:
                     assert e.node_minus.pair
                     assert e.node_minus.pair.parent != NULL
-
-
-                if e.tag & TAG_DBL_OUTER:
-                    assert e.node_minus.pair 
-                    assert e.node_minus.pair.parent != NULL
-                    assert e.node_plus.pair 
-                    assert e.node_plus.pair.parent != NULL
-
-
-
 
             assert e.tag & TAG_WORK == 0
 
@@ -379,22 +368,28 @@ cdef class Graph:
         assert node_in_tree.pair != NULL
         assert node_in_tree.pair.parent != NULL
         cdef instruction *ins
-        ins = &self.outer_edges[self.len_outer_edges]
-        ins.edge = e
-        e.instr_id += 1
-        ins.instr_id = e.instr_id
 
-        self.len_outer_edges += 1
-        e.tag += TAG_PLUS_OUTER # sets double outer edge tag if already outer!
+
+        if e.tag & TAG_OUTER:
+            e.tag |= TAG_DOUBLE
+        e.tag |= TAG_OUTER
+
         if e.node_plus != node_in_tree:
             swap_nodes(e)
+
+        ins = &self.outer_edges[self.len_outer_edges]
+        self.len_outer_edges += 1
+        ins.instr_id = e.tag
+        ins.edge = e
 
     cdef void add_inner_edge(self, edge *e, node *node_in_tree):
         assert node_in_tree.pair != NULL
         assert node_in_tree.pair.parent != NULL
         self.inner_edges[self.len_inner_edges] = e
         self.len_inner_edges += 1
-        e.tag |= TAG_MINUS_INNER 
+        if e.tag & TAG_INNER:
+            e.tag |= TAG_DOUBLE
+        e.tag |= TAG_INNER 
         if e.node_minus != node_in_tree:
             swap_nodes(e)
 
@@ -602,6 +597,7 @@ cdef class Graph:
                     blossom.n_edges += 1
                     e.node_plus.edge_list[i].tag &= ~TAG_WORK
                     #self.add_outer_edge(e.node_plus.edge_list[i], blossom)
+                    #should not be necessary
                     if e.node_plus.edge_list[i].parent != NULL:
                         e.node_plus.edge_list[i].parent = blossom.pair
 
@@ -616,6 +612,10 @@ cdef class Graph:
                     else:
                         e.node_minus.edge_list[i].node_plus = blossom
                     blossom.n_edges += 1
+                    if e.node_minus.edge_list[i].tag & (TAG_INNER | TAG_DOUBLE) == TAG_INNER | TAG_DOUBLE:
+                        e.node_minus.edge_list[i].tag &= ~TAG_DOUBLE
+                    else:
+                        e.node_minus.edge_list[i].tag &= ~TAG_INNER
                     self.add_outer_edge(e.node_minus.edge_list[i], blossom)
                     e.node_minus.edge_list[i].tag &= ~TAG_WORK
 
@@ -679,6 +679,7 @@ cdef class Graph:
         if blossom.pair.node_plus == blossom:
             swap_nodes(blossom.pair)
 
+        print(1.1)
 
         # restore graph structure
         for i in range(blossom.n_edges):
@@ -687,6 +688,12 @@ cdef class Graph:
                 e.node_plus = blossom.restore_list[i]
             else:
                 e.node_minus = blossom.restore_list[i]
+            if e.tag & (TAG_INNER | TAG_DOUBLE) == TAG_INNER | TAG_DOUBLE:
+                e.tag &= ~TAG_DOUBLE
+            else:
+                e.tag &= ~TAG_INNER
+            e.tag &= ~TAG_BLOSSOM
+        print(1.2)
 
         # re-pair blossom if necessary
         if blossom.pair.node_minus.pair != <edge*> -1:
@@ -702,14 +709,23 @@ cdef class Graph:
             while e.cycle != start:
                 self._pair_edge(e)
                 e = e.cycle.cycle
+        print(1.3)
 
         blossom.pair.node_minus.pair = blossom.pair
 
         # regrow the tree
         e2 = blossom.pair.parent
+        print(e2.index)
+        print(<int>e2.node_minus.pair.index)
+        print(1.35)
 
-        if (e2.node_minus.pair.cycle.node_minus == e2.node_minus or
+        if (e2.node_minus.pair.cycle == NULL):
+            #tree is not running through blossom, done
+            pass
+
+        elif (e2.node_minus.pair.cycle.node_minus == e2.node_minus or
                 e2.node_minus.pair.cycle.node_plus == e2.node_minus):
+            print(1.4)
             # tree grows against cycle
 
             # run up to the pairing node
@@ -727,6 +743,8 @@ cdef class Graph:
 
             if e2.node_plus.pair == blossom.pair:
                 swap_nodes(e2)
+            for i in range(e2.node_minus.n_edges):
+                self.add_inner_edge(e2.node_minus.edge_list[i], e2.node_minus)
 
             while e2 != start:
                 if e2.node_minus.pair == e2:
@@ -738,6 +756,20 @@ cdef class Graph:
                 e2.parent = e2.cycle
                 self.tree[self.len_tree] = e2
                 self.len_tree += 1
+                for i in range(e2.node_plus.n_edges):
+                    self.add_inner_edge(e2.node_plus.edge_list[i], e2.node_plus)
+                e2 = e2.cycle
+                if e2.node_minus.pair == e2:
+                    if e2.cycle.node_plus == e2.node_minus:
+                        swap_nodes(e2.cycle)
+                else:
+                    if e2.cycle.node_minus == e2.node_plus:
+                        swap_nodes(e2.cycle)
+                e2.parent = e2.cycle
+                self.tree[self.len_tree] = e2
+                self.len_tree += 1
+                for i in range(e2.node_minus.n_edges):
+                    self.add_inner_edge(e2.node_minus.edge_list[i], e2.node_minus)
                 e2 = e2.cycle
 
 
@@ -748,26 +780,32 @@ cdef class Graph:
 
         else:
             # tree grows along cycle
+            print(1.5)
+
             while e2.node_minus.pair != blossom.pair:
                 e = e2
                 e2 = e.node_minus.pair
 
                 if e2.node_plus == e.node_minus:
                     swap_nodes(e2)
-
                 e2.parent = e
-
                 self.tree[self.len_tree] = e
                 self.len_tree += 1
+                for i in range(e2.node_minus.n_edges):
+                    self.add_inner_edge(e2.node_minus.edge_list[i], e2.node_minus)
+
                 e = e2
                 e2 = e.cycle
-
                 if e2.node_minus == e.node_plus:
                     swap_nodes(e2)
-
                 e2.parent = e
                 self.tree[self.len_tree] = e2
                 self.len_tree += 1
+                for i in range(e2.node_plus.n_edges):
+                    self.add_outer_edge(e2.node_plus.edge_list[i], e2.node_plus)
+
+            for i in range(e2.node_minus.n_edges):
+                self.add_inner_edge(e2.node_minus.edge_list[i], e2.node_minus)
 
             blossom.pair.parent = e2
 
@@ -843,7 +881,7 @@ cdef class Graph:
 
         if e.parent:
             return "already in tree"
-        if e.cycle != NULL or e.tag > 0:
+        if e.cycle != NULL:
             return "in cycle"
         if e.node_plus.pair == NULL or e.node_plus.pair.parent == NULL:
             return "not outer"
@@ -869,15 +907,17 @@ cdef class Graph:
 
         self.set_root()
 
+        self.show()
         ip = 0
         while ip < self.len_outer_edges and step < upto:
 
-            try:
-                self.check_all()
-            except AssertionError, e:
-                self.show()
-                raise e
-            if self.outer_edges[ip].edge.instr_id == self.outer_edges[ip].instr_id:
+            # try:
+                # self.check_all()
+            # except AssertionError, e:
+                # self.show()
+                # raise e
+            r = ""
+            if self.outer_edges[ip].edge.tag == self.outer_edges[ip].instr_id:
                 print("step", step,"edge", self.outer_edges[ip].edge.index)
                 r = self.do_edge(self.outer_edges[ip].edge.index)
                 print(r)

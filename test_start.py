@@ -33,7 +33,7 @@ def test_add_three_vertices(triangle_graph):
     assert g.len_nodes == 3
     assert g.len_edges == 3
 
-
+@pytest.mark.xfail()
 def test_show(triangle_graph, capsys):
     g = triangle_graph
     g.show()

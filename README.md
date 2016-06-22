@@ -42,13 +42,14 @@ add to the edge. If the counters do not agree anymore, the entry in the list is 
 
 
 Other approach: each list has a tag bitfield with the following information:
-  - tag[0]: working tag
-  - tag[1]: the edge is in a blossom
-  - tag[2]: the edge is an inner edge from the minus node
-  - tag[3]: the edge is an outer edge from the plus node
-  - tag[4]: the edge is a double outer edge
+  - tag[0]: (W) working tag
+  - tag[1]: (B) the edge is in a blossom
+  - tag[2]: (O) the plus edge of the blossom is in the tree (is outer edge)
+  - tag[3]: (I) the minus edge of the blossom is in the tree (is inner edge)
+  - tag[4]: (D) the other edge is in the tree as well, with same sign (exactly one of O,I must be set) (double edge)
 
-If the edge is in the tree, 2 and 3 are set.
+
+If the edge is in the tree, OI are set. If the edge is in a blossom, either OIB or ODB or IDB are set.
 
 Note that the tree is considered a tree of edges, not a tree of nodes! (better structure in my opinion)
 
