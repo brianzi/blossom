@@ -33,6 +33,7 @@ def test_add_three_vertices(triangle_graph):
     assert g.len_nodes == 3
     assert g.len_edges == 3
 
+
 @pytest.mark.xfail()
 def test_show(triangle_graph, capsys):
     g = triangle_graph
@@ -135,14 +136,18 @@ def test_bv_example_shrink():
     for (u, v) in {(1, 3), (2, 4), (5, 7), (6, 8), (10, 11)}:
         bv.pair_edge(m[u, v])
 
+    bv.check_all()
+
     bv.raw_set_root(0)
+    bv.check_all()
 
     bv.grow(m[0, 1])
+    bv.check_all()
     bv.grow(m[3, 5])
+    bv.check_all()
     bv.grow(m[0, 2])
-
+    bv.check_all()
     bv.shrink(m[3, 4])
-
     bv.check_all()
 
 
@@ -171,36 +176,57 @@ def test_bv_example_shrink2():
         m[u, v] = idx
 
     bv.set_root()
+    bv.check_all()
 
     bv.augment(bv.get_outer_edges()[0])
+    bv.check_all()
 
     bv.set_root()
+    bv.check_all()
 
     bv.grow(6)
+    bv.check_all()
 
     bv.augment(12)
+    bv.check_all()
 
     bv.set_root()
+    bv.check_all()
 
     bv.grow(11)
+    bv.check_all()
+
     bv.grow(6)
+    bv.check_all()
+
     bv.shrink(1)
+    bv.check_all()
 
     bv.augment(4)
+    bv.check_all()
 
     bv.raw_set_root(5)
+    bv.check_all()
+
     bv.grow(13)
+    bv.check_all()
 
     bv.expand(14)
+    bv.check_all()
 
     bv.augment(3)
+    bv.check_all()
 
     bv.set_root()
+    bv.check_all()
 
     bv.grow(bv.get_outer_edges()[0])
+    bv.check_all()
 
     bv.augment(10)
+    bv.check_all()
 
+    bv.check_all()
     bv.check_all()
 
 

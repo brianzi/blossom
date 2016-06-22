@@ -47,10 +47,6 @@ cdef:
         int tag
         edge *edge
 
-
-
-
-
 cdef void swap_nodes(edge *e):
     cdef node *t
     t = e.node_plus
@@ -201,7 +197,6 @@ cdef class Graph:
                  -1 if e.cycle == NULL else e.cycle.index,
                 e.tag))
 
-
     def plot(self, ax=None):
         cdef edge *e
         if ax is None:
@@ -260,8 +255,11 @@ cdef class Graph:
             plt.plot(xs, ys, "-", lw=lw, color=color)
 
     def check_all(self):
-        pass 
-
+        # self.check_graph_integrity()
+        # self.check_pairing()
+        # self.check_tree_integrity()
+        self.check_tags()
+        pass
 
     def check_graph_integrity(self):
         "For all edges, check whether the nodes declared as node_plus and node_minus have edge listed as incident"
@@ -334,27 +332,61 @@ cdef class Graph:
         "check if the tags of all the edges are correct"
         cdef edge* e
 
+        cdef int plus_out_in_tree, plus_inn_in_tree, minus_inn_in_tree, minus_out_in_tree
+
         for i in range(self.len_edges):
             e = &self.edges[i]
 
+            if not e.tag & TAG_BLOSSOM:
 
-            if e.tag & TAG_BLOSSOM:
-                if e.cycle == NULL:
-                    assert e.node_plus.pair == <edge*> -1 or e.node_plus.pair.cycle != NULL
-                    assert e.node_minus.pair == <edge*> -1 or e.node_minus.pair.cycle != NULL
-
-            else:
-
-                if e.tag & TAG_OUTER:
-                    assert e.node_plus.pair != NULL
-                    assert e.node_plus.pair.parent != NULL
-
+                print(1)
+                plus_out_in_tree = (e.node_plus.pair != NULL 
+                        and e.node_plus.pair != <edge*> -1 
+                        and e.node_plus.pair.parent != NULL
+                        and e.node_plus.pair.node_plus == e.node_plus)
+                print(2)
+                plus_inn_in_tree = (e.node_plus.pair != NULL 
+                        and e.node_plus.pair != <edge*> -1 
+                        and e.node_plus.pair.parent != NULL
+                        and e.node_plus.pair.node_minus == e.node_plus)
+                print(3)
+                minus_inn_in_tree = (e.node_minus.pair != NULL 
+                        and e.node_minus.pair != <edge*> -1 
+                        and e.node_minus.pair.parent != NULL
+                        and e.node_minus.pair.node_minus == e.node_minus)
+                print(4)
+                minus_out_in_tree = (e.node_minus.pair != NULL 
+                        and e.node_minus.pair != <edge*> -1 
+                        and e.node_minus.pair.parent != NULL
+                        and e.node_minus.pair.node_plus == e.node_minus)
 
                 if e.tag & TAG_INNER:
-                    assert e.node_minus.pair
-                    assert e.node_minus.pair.parent != NULL
+                    assert minus_inn_in_tree
 
-            assert e.tag & TAG_WORK == 0
+                if e.tag & TAG_OUTER: 
+                    assert plus_out_in_tree
+
+                if e.tag & TAG_INNER and e.tag & TAG_DOUBLE:
+                    assert plus_inn_in_tree and minus_inn_in_tree
+
+                if e.tag & TAG_OUTER and e.tag & TAG_DOUBLE:
+                    assert plus_out_in_tree and minus_out_in_tree
+
+            if e.tag & TAG_BLOSSOM:
+                node_plus_in_blossom = (
+                    e.node_plus.pair == <edge*> -1 
+                    or (e.node_plus.pair != NULL
+                        and e.node_plus.pair.cycle != NULL))
+                node_minus_in_blossom = (
+                    e.node_minus.pair == <edge*> -1 
+                    or (e.node_minus.pair != NULL
+                        and e.node_minus.pair.cycle != NULL))
+
+                assert node_minus_in_blossom and node_minus_in_blossom
+
+
+
+
 
     cdef void add_outer_edge(self, edge *e, node *node_in_tree):
         cdef instruction *ins
