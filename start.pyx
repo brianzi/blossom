@@ -41,11 +41,10 @@ cdef:
         edge *cycle
         int tag
 
-        int instr_id
 
     struct instruction:
         int delta
-        int instr_id
+        int tag
         edge *edge
 
 
@@ -206,9 +205,6 @@ cdef class Graph:
                  -1 if e.cycle == NULL else e.cycle.index,
                 e.tag))
 
-        # print([(self.outer_edges[i].edge.index,
-            # self.outer_edges[i].instr_id)
-            # for i in range(self.len_outer_edges)])
 
     def plot(self, ax=None):
         cdef edge *e
@@ -379,7 +375,7 @@ cdef class Graph:
 
         ins = &self.outer_edges[self.len_outer_edges]
         self.len_outer_edges += 1
-        ins.instr_id = e.tag
+        ins.tag = e.tag
         ins.edge = e
 
     cdef void add_inner_edge(self, edge *e, node *node_in_tree):
@@ -565,14 +561,11 @@ cdef class Graph:
         while e != unpaired_e:
             for i in range(e.node_plus.n_edges):
                 e.node_plus.edge_list[i].tag += TAG_WORK # sets TAG_BLOSSOM if hit twice
-                e.node_plus.edge_list[i].instr_id += 1
             for i in range(e.node_minus.n_edges):
                 e.node_minus.edge_list[i].tag += TAG_WORK
-                e.node_minus.edge_list[i].instr_id += 1
             e = e.cycle.cycle
         for i in range(e.node_plus.n_edges):
             e.node_plus.edge_list[i].tag += TAG_WORK
-            e.node_plus.edge_list[i].instr_id += 1
 
         #run a second time to add them to the edge and restore lists and change the node ends
 
@@ -917,7 +910,7 @@ cdef class Graph:
                 # self.show()
                 # raise e
             r = ""
-            if self.outer_edges[ip].edge.tag == self.outer_edges[ip].instr_id:
+            if self.outer_edges[ip].edge.tag == self.outer_edges[ip].tag:
                 print("step", step,"edge", self.outer_edges[ip].edge.index)
                 r = self.do_edge(self.outer_edges[ip].edge.index)
                 print(r)
