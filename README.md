@@ -1,22 +1,18 @@
 The plan
 --------
 
-
-
-Invariants: 
-  - graph structure: each node refers to the nodes that in turn refer to the right edges. (Should also be connected!)
-  - matching: the matching of should always be a (not complete) matching vector. A node indicating an edge as pairing should be indicated by both nodes.
-  - tree: should be connected, should be an alternating tree.
-  - outer edges list should hold the outer edges of the tree.
-
+We need a graph whose shape can be modified dynamically. 
+We store a list of edges and a list of nodes.
 
 We associate with each edge the following information:
   - slack: The slackness that we use to find the next instruction
-  - node plus and node minus. The two nodes connected by this edge. Initially, two vertices. These change when blossoms are shrunk or expanded.
+  - node plus and node minus. The two nodes connected by this edge. 
+Initially, two vertices. These change when blossoms are shrunk or expanded.
+When the edge touches the tree, these vertices should be correct (if possible).
   - parent edge. When the edge is in the alternating tree, this edge is the edge one step closer to the root. 
     If x(e)=1, x(parent(e))=0 and vice versa, by the defnition of the alternating tree.
   - cycle edge. When the tree is in a blossom, should point along the blossom cycle. 
-
+  - a tag bitfield, denoting the position of the edge with respect to the tree. see below.
 
 We associate with each node the following information:
   - y: The dual variable related to a constraint due to this node
@@ -26,49 +22,50 @@ node in a blossom.
   - If the node is a blossom, we also need:
     - restore list: for each edge in the edge list, we store the subnode that this edge is was connected to before forming the blossom. 
   
-  
 Note that len(edge list) = len(restore list), we could align the two in one list. (we don't do right now)
 
 An alternating tree is built with an unpaired edge at the root, and then alternatingly paired and unpaired (x=0, 1) edges as descendents, leaves must always be paired. 
 
-We also keep
-  - treelist: List of all edges that are currently in the tree.
-  - outer edges: list of all edges that are not in tree but incident to a (+) node in the tree
-  - inner edges: all edges not in tree but incident to (-) node in tree
+We also keep a list of all edges that share at least one node with the tree, called 
+`seen_list`.
 
+During the growth of the tree, this list is updated. At the same time,
+we denote the status of the edge in a `tag` field.
 
-During the growth of the tree, these three lists change. We keep track of this by storing them in the list together with a counter label, which we also
-add to the edge. If the counters do not agree anymore, the entry in the list is considered invalid.
-
-
-Other approach: each list has a tag bitfield with the following information:
-  - tag[0]: (W) working tag
-  - tag[1]: (B) the edge is in a blossom
+There are five bits in the tag field:
+  - tag[0]: (W) working tag (only used temporarily while forming a blossom)
+  - tag[1]: (B) the edge is in a blossom which was created in the current tree
   - tag[2]: (O) the plus edge of the blossom is in the tree (is outer edge)
   - tag[3]: (I) the minus edge of the blossom is in the tree (is inner edge)
   - tag[4]: (D) the other edge is in the tree as well, with same sign (exactly one of O,I must be set) (double edge)
 
-
 If the edge is in the tree, OI are set. If the edge is in a blossom, either OIB or ODB or IDB are set.
+OI can also be set if the edge is not in the tree, but touching a plus and a minus node.
+Such edges can be treated like in the tree for all purposes, so this is fine.
 
-Note that the tree is considered a tree of edges, not a tree of nodes! (better structure in my opinion)
+Note that the tree is considered a tree of edges, not a tree of nodes! 
 
-Blossom algorithm requires the following operations:
+The root of the tree is an edge with the special name `root`. It can be distinguished from
+any other edge by having itself as parent.
 
-grow: for all (+)/(-) vertices in the graph, increase/decrease y by dw. Input: whole tree
+Invariants: 
+  - graph structure: each node refers to the nodes that in turn refer to the right edges. (Should also be connected!)
+  - matching: the matching of should always be a (not complete) matching vector. A node indicating an edge as pairing should be indicated by both nodes.
+  - tree: should be connected, should be an alternating tree.
+  - tags should be always consistent with the position with respect to the tree
+
+Blossom algorithm requires the following operations on the graph:
 
 - add: add a paired and an unpaired edge to the tree. 
 
-This is done providing an unpaired edge not in the tree, and a paired edge in the tree defining the position where to add. 
-The unpaired edge must be incident on the (+) vertex of the paired edge.
-From the unpaired edge, the other node is found, and from the node, the other paired edge is found.
+This is done by specifying an O edge, whose nodes are both paired (one of them in the tree).
+This edge is added to the tree and also the second node pair is added to the tree.
 
-Later we will in this step also examine all outer edges of the newly added edge and add instructions to make them tight to the 
-instruction list.
+All new edges must be examined and added to the seen list.
 
 - make blossom: create a new node ("blossom"). 
 
-As input, give two paired edges in the tree whose (+) nodes should be joined.
+The input is a DO edge
 
 In a first step, we need to find the cycle formed by the tree and this additional edge.
 We backtrack the first node to the root, leaving breadcrumbs (forward references from parent to child).
@@ -90,16 +87,17 @@ We then traverse the circle a second time to build the edge list and restore lis
 (including only outer edges, using the tags generated in the previous step), and change all the edges
 to be incident with new node.
 
-Here is a problem: We don't know which of the two nodes stored in the edge is the one that must be changed. Is there anything we can do except an if clause?
+Also register all these nodes as outer nodes, 
+
 
 - expand blossom. 
 
-Essentially the inverse of make_blossom. Use the restore list to restore the previous node structure. While doing so, the node must be paired, and 
+Essentially the inverse of `make_blossom`. Use the restore list to restore the previous node structure. While doing so, the node must be paired, and 
 that pairing is used to settle the pairing inside the blossom (which might be different from the incomplete pairing left behind when the blossom was formed)
 
-The input is the node and the edge matching the node. We follow the restore list and revert all edges to their previous state. At the same time,
-we follow along in the subnode list. When we encounter the matching edge of the blossom, we start toggling the matchings of
-edges of the cycle.
+The input is the blossom node. Follow the restore list and revert all edges to their previous state.  
+
+Then follow 
 
 - augment: Given an unpaired egde emanating from the tree, add it to the tree by letting x <- 1-x along the path from (including) the unpaired edge to the root of the tree. 
 The tree is then "done" and a new tree is formed.
