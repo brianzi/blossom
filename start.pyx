@@ -431,16 +431,10 @@ cdef class Graph:
 
         assert edge_index < self.len_edges 
 
-
-
         unpaired_e = &self.edges[edge_index]
 
         assert unpaired_e.node_plus.pair != unpaired_e
         assert unpaired_e.node_minus.pair != unpaired_e
-
-
-        if unpaired_e.node_plus.pair == NULL:
-            swap_nodes(unpaired_e)
 
         assert unpaired_e.node_plus.pair != NULL
         assert unpaired_e.node_plus.pair.parent != NULL
