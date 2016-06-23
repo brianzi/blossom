@@ -255,9 +255,9 @@ cdef class Graph:
             plt.plot(xs, ys, "-", lw=lw, color=color)
 
     def check_all(self):
-        # self.check_graph_integrity()
-        # self.check_pairing()
-        # self.check_tree_integrity()
+        self.check_graph_integrity()
+        self.check_pairing()
+        self.check_tree_integrity()
         self.check_tags()
         pass
 
