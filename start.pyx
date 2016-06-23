@@ -453,8 +453,6 @@ cdef class Graph:
             self._pair_edge(edge_in_tree.parent)
             edge_in_tree = edge_in_tree.parent.parent
 
-        for i in range(self.len_instructions):
-            self.instructions[i].edge.tag = 0
         for i in range(self.len_seen_edges):
             self.seen_edges[i].tag = 0
             self.seen_edges[i].parent = NULL
