@@ -40,8 +40,6 @@ cdef:
 
         edge *cycle
         int tag
-
-
     struct instruction:
         int delta
         int tag
@@ -73,10 +71,10 @@ cdef class Graph:
 
     cdef edge root
 
-    cdef int len_outer_edges
-    cdef instruction *outer_edges
-    cdef int len_inner_edges
-    cdef edge **inner_edges
+    cdef int len_instructions
+    cdef instruction *instructions
+    cdef int len_seen_edges
+    cdef edge **seen_edges
 
     cdef public int size, max_neighbors
 
@@ -89,8 +87,8 @@ cdef class Graph:
         self.edges = <edge*> malloc(size*sizeof(edge))
         self.incidence = <edge**> malloc(size*max_neighbors*sizeof(edge*))
         self.restore = <node**> malloc(size*sizeof(node*))
-        self.outer_edges = <instruction*> malloc(size*sizeof(instruction))
-        self.inner_edges = <edge**> malloc(size*sizeof(edge*))
+        self.instructions = <instruction*> malloc(size*sizeof(instruction))
+        self.seen_edges = <edge**> malloc(size*sizeof(edge*))
 
         self.pos_x = <float*> malloc(size*sizeof(float))
         self.pos_y = <float*> malloc(size*sizeof(float))
@@ -99,8 +97,8 @@ cdef class Graph:
         self.len_edges = 0
         self.len_incidence = 0
         self.len_restore = 0
-        self.len_outer_edges = 0
-        self.len_inner_edges = 0
+        self.len_instructions = 0
+        self.len_seen_edges = 0
 
         self.root.node_plus = NULL
         self.root.node_minus = NULL
@@ -259,6 +257,7 @@ cdef class Graph:
         self.check_pairing()
         self.check_tree_integrity()
         self.check_tags()
+        self.check_seen_edges()
         pass
 
     def check_graph_integrity(self):
@@ -339,22 +338,18 @@ cdef class Graph:
 
             if not e.tag & TAG_BLOSSOM:
 
-                print(1)
                 plus_out_in_tree = (e.node_plus.pair != NULL 
                         and e.node_plus.pair != <edge*> -1 
                         and e.node_plus.pair.parent != NULL
                         and e.node_plus.pair.node_plus == e.node_plus)
-                print(2)
                 plus_inn_in_tree = (e.node_plus.pair != NULL 
                         and e.node_plus.pair != <edge*> -1 
                         and e.node_plus.pair.parent != NULL
                         and e.node_plus.pair.node_minus == e.node_plus)
-                print(3)
                 minus_inn_in_tree = (e.node_minus.pair != NULL 
                         and e.node_minus.pair != <edge*> -1 
                         and e.node_minus.pair.parent != NULL
                         and e.node_minus.pair.node_minus == e.node_minus)
-                print(4)
                 minus_out_in_tree = (e.node_minus.pair != NULL 
                         and e.node_minus.pair != <edge*> -1 
                         and e.node_minus.pair.parent != NULL
@@ -384,13 +379,26 @@ cdef class Graph:
 
                 assert node_minus_in_blossom and node_minus_in_blossom
 
+            if e.parent != NULL:
+                assert e.tag & TAG_INNER and e.tag & TAG_OUTER
 
+    def check_seen_edges(self):
+        """Check whether all edges that have inner or outer tag set are in the seen list.
+        The opposite need not be true, after expanding a blossom.
+        """
+        cdef edge *e, 
+        for i in range(self.len_edges):
+            e = &self.edges[i]
 
-
+            if e.tag & TAG_INNER or e.tag & TAG_OUTER:
+                for j in range(self.len_seen_edges):
+                    if self.seen_edges[j] == e:
+                        break
+                else:
+                    raise ValueError("tagged edge %d not in seen edge list")
 
     cdef void add_outer_edge(self, edge *e, node *node_in_tree):
         cdef instruction *ins
-
 
         if e.tag & TAG_OUTER:
             e.tag |= TAG_DOUBLE
@@ -399,38 +407,23 @@ cdef class Graph:
         if e.node_plus != node_in_tree:
             swap_nodes(e)
 
-        ins = &self.outer_edges[self.len_outer_edges]
-        self.len_outer_edges += 1
+        ins = &self.instructions[self.len_instructions]
+        self.len_instructions += 1
         ins.tag = e.tag
         ins.edge = e
 
+        self.seen_edges[self.len_seen_edges] = e
+        self.len_seen_edges += 1
+
     cdef void add_inner_edge(self, edge *e, node *node_in_tree):
-        self.inner_edges[self.len_inner_edges] = e
-        self.len_inner_edges += 1
         if e.tag & TAG_INNER:
             e.tag |= TAG_DOUBLE
         e.tag |= TAG_INNER 
         if e.node_minus != node_in_tree:
             swap_nodes(e)
 
-    def check_outer_edges(self):
-        cdef edge *e
-        cdef edge *te
-        for i in range(self.len_outer_edges):
-            e = self.outer_edges[i].edge
-
-            assert e.node_plus.pair != NULL
-            if e.node_plus.pair != <edge*> -1:
-                assert e.node_plus.pair.parent != NULL
-
-        # for ti in range(self.len_tree):
-            # for ei in range(te.node_plus.n_edges):
-                # e = te.node_plus.edge_list[ei]
-                # if e.parent == NULL:
-                    # for oi in range(self.len_outer_edges):
-                        # if self.outer_edges[oi].edge == e:
-                            # break
-                    # assert self.outer_edges[oi].edge == e
+        self.seen_edges[self.len_seen_edges] = e
+        self.len_seen_edges += 1
 
     def augment(self, edge_index):
         cdef edge *unpaired_e
@@ -460,14 +453,14 @@ cdef class Graph:
             self._pair_edge(edge_in_tree.parent)
             edge_in_tree = edge_in_tree.parent.parent
 
-        for i in range(self.len_outer_edges):
-            self.outer_edges[i].edge.tag = 0
-        for i in range(self.len_inner_edges):
-            self.inner_edges[i].tag = 0
-            self.inner_edges[i].parent = NULL
+        for i in range(self.len_instructions):
+            self.instructions[i].edge.tag = 0
+        for i in range(self.len_seen_edges):
+            self.seen_edges[i].tag = 0
+            self.seen_edges[i].parent = NULL
 
-        self.len_inner_edges = 0
-        self.len_outer_edges = 0
+        self.len_seen_edges = 0
+        self.len_instructions = 0
 
         self.root.node_plus = NULL
 
@@ -903,7 +896,7 @@ cdef class Graph:
 
         self.show()
         ip = 0
-        while ip < self.len_outer_edges and step < upto:
+        while ip < self.len_instructions and step < upto:
 
             # try:
                 # self.check_all()
@@ -911,9 +904,9 @@ cdef class Graph:
                 # self.show()
                 # raise e
             r = ""
-            if self.outer_edges[ip].edge.tag == self.outer_edges[ip].tag:
-                print("step", step,"edge", self.outer_edges[ip].edge.index)
-                r = self.do_edge(self.outer_edges[ip].edge.index)
+            if self.instructions[ip].edge.tag == self.instructions[ip].tag:
+                print("step", step,"edge", self.instructions[ip].edge.index)
+                r = self.do_edge(self.instructions[ip].edge.index)
                 print(r)
                 step +=1
             ip += 1
@@ -992,12 +985,12 @@ cdef class Graph:
 
         return n.index
 
-    def get_outer_edges(self):
-        outer_edges = []
-        for i in range(self.len_outer_edges):
-            outer_edges.append(self.outer_edges[i].edge.index)
+    def get_instructions(self):
+        instructions = []
+        for i in range(self.len_instructions):
+            instructions.append(self.instructions[i].edge.index)
 
-        return outer_edges
+        return instructions
 
     def raw_set_parent(self, parent_index, child_index):
 
@@ -1023,7 +1016,7 @@ cdef class Graph:
         free(self.edges)
         free(self.incidence)
         free(self.restore)
-        free(self.outer_edges)
+        free(self.instructions)
         free(self.pos_x)
         free(self.pos_y)
     

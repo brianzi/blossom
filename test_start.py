@@ -178,7 +178,7 @@ def test_bv_example_shrink2():
     bv.set_root()
     bv.check_all()
 
-    bv.augment(bv.get_outer_edges()[0])
+    bv.augment(0)
     bv.check_all()
 
     bv.set_root()
@@ -220,7 +220,7 @@ def test_bv_example_shrink2():
     bv.set_root()
     bv.check_all()
 
-    bv.grow(bv.get_outer_edges()[0])
+    bv.grow(7)
     bv.check_all()
 
     bv.augment(10)
@@ -260,7 +260,7 @@ def test_bv_example_expand():
 
     bv.set_root()
 
-    bv.augment(bv.get_outer_edges()[0])
+    bv.augment(0)
 
     bv.set_root()
 
