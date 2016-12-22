@@ -102,3 +102,75 @@ Then follow
 - augment: Given an unpaired egde emanating from the tree, add it to the tree by letting x <- 1-x along the path from (including) the unpaired edge to the root of the tree. 
 The tree is then "done" and a new tree is formed.
 
+
+Alternative Plan 
+================
+
+After some consideration, it might be worthwile to think about a more minimal
+data storage model; computations are often cheap.
+
+We store a list of vertices, and for each vertex we store a list of neighboring
+vertices, together with the weight of the corresponding edges, which is not
+modified after creation.
+
+Blossoms are also created as vertices. For each vertex, we store a "blossom
+parent", which is set to the blossom vertex the vertex is part of.  For
+breaking a blossom, we thus also want to store a list of all the blossom
+children; we only need to reset their blossom pointer to NULL.  Essentially, we
+are thus storing the laminar covering as a doubly linked tree.
+
+Instead, it might be possible to not store the children, just mark blossom
+vertices as destroyed somehow, and unlink the children when they ever try to
+access their parent and note its destruction?
+
+Furthermore, for each vertex we store its partner in the matching, and its
+parent in the tree.
+
+The matching is a matching in M prime, that is, matching[v] must 
+have the same blossom parent as v.
+
+If a vertex has a blossom parent, it will never be part of the tree. At the
+moment it becomes part of a blossom, its tree pointer nicely traces the blossom
+towards its stem. We thus could use the tree pointer for restoring blossoms. It
+would be the same idea as above: When making a blossom, revert one branch in
+direction, so that the tree pointer forms a circuit tracing the blossom. When
+restoring a blossom, start with the newly paired vertex and re-pair by going
+around the cycle once. 
+
+It might also be a good idea to store a running index I(v) for each 
+element when added to the tree. This way, I(v) is decreasing towards the root.
+This should allow for easy finding of common ancestors:
+
+``` 
+    while w!=v: 
+      if I(v) > I(w): 
+        v = parent(v) 
+      else: 
+        w = parent(w)
+      # v and w traverse the cycle, do something to them...  
+```
+
+When creating a blossom, set its index to the index of the stem, preserving the
+decreasing property.      
+        
+Also, since vertices are always added in plus-minus-pairs, the lowest bit
+of I(v) determines whether a node is inner or outer.
+
+When considering new outer edges, it needs to be determined whether a vertex is
+in the tree already. If that is done by considering whether the tree pointer is
+set, one needs to remove all tree pointers when collapsing the tree, which
+takes time.  Instead, one could keep I(v) running between trees, and check tree
+membership by comparing with `tree_index[root]`. Then we only run into trouble
+when this index overruns...
+
+
+Outer edge list
+---------------
+The algorithm requires to uphold a list of outer edges, i.e. edges connecting
+a plus node in the tree with another node.
+(The other node is either not in the tree or a plus node itself, call it 
+"available")
+Every node might be available in several ways, but once 
+it is processed once, its availability will change from
+not in tree -> in tree -> in blossom (not available any more).
+
