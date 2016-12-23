@@ -163,14 +163,51 @@ takes time.  Instead, one could keep I(v) running between trees, and check tree
 membership by comparing with `tree_index[root]`. Then we only run into trouble
 when this index overruns...
 
+However, with weights, collapsing the tree requires dual updates on the 
+whole tree anyway, so that looping over the tree is required in any case,
+and we maintain a list, collecting all elements in the tree.
 
-Outer edge list
+
+Outer edges
 ---------------
-The algorithm requires to uphold a list of outer edges, i.e. edges connecting
-a plus node in the tree with another node.
-(The other node is either not in the tree or a plus node itself, call it 
-"available")
-Every node might be available in several ways, but once 
-it is processed once, its availability will change from
-not in tree -> in tree -> in blossom (not available any more).
 
+Vertices that are reachable from an outer node could be "added" to the tree,
+if they are a) not in the tree, or b) an outer edge.
+In case a) the tree is grown, in case b) a blossom is formed.
+
+
+For that, they are held in a linked data structure.
+If no weight calculation is performed, a stack (i.e. simple linked list) is
+sufficient. If weight calculation is performed, the data structure must be
+a heap that supports `decrease_key`. A Fibonacci heap is known to be best 
+asymptotically; a simpler structure might be preferrable. I go for a
+doubly-linked list (with insertion sort) for now, and look at different
+heaps later.
+
+
+Dual updates
+------------
+
+Before collapsing the tree, the root is unpaired, and its dual variable is 0.
+
+Then, a tree is build, and after collapsing, the dual variables on the tree
+are updated so that all edges in the tree are tight.
+
+When adding a node to the tree, we mark it with the dual-reduced distance d(v,r) 
+to the root. When finally an outer node o hits a cond unpaired node n2,
+the dual of each element v in the tree is updated by +- (d(v, r) + d(o,n2)).
+
+The distance to the root needs already be calculated when adding to the 
+availability heap. 
+
+
+Distance calculation: When the tree is grown along an edge e(o, i), (o in the
+tree) the distance from the new inner and outer node to node is given by 
+
+d(i, r) = d(o, r) + w(e) - dual(o) - dual(i)
+
+The distance of the new outer node o2 = m(i) is the same.
+
+One might shortcut this because previously collapsed trees 
+tend to leave big chunks of zero-distance nodes, but this is the general idea of
+having several trees.
