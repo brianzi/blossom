@@ -72,7 +72,7 @@ void grow_tree() {
     for(i=0; i <= MAX_DEGREE && adjacence[b][i] != NONE; i++) {
         a = adjacence[b][i];
         //TODO distance calculation
-        //d = available_dist[b][i] + weight[b][i] - dual[a] - dual[b];
+        d = available_dist[b] + weight[b][i] - dual[a] - dual[b];
         if (available_from[a] == NONE) {
         //TODO if distance has decreased: update and bubble
         //if or available_from = NONE: insertion sort
@@ -85,7 +85,7 @@ void grow_tree() {
 
                 //set value
                 available_from[a] = b;
-                //TODO available_dist[a] = d;
+                available_dist[a] = d;
            }
         }
     }
@@ -114,7 +114,9 @@ void start_tree() {
         available_top = b; 
 
         available_from[b] = a;
-        //TODO: add distance calc
+
+        d = weight[a][i] - dual[a] - dual[b];
+        available_dist[b] = d;
     }
 }
 
@@ -127,6 +129,8 @@ int blossom_of(int v) {
 
 void collapse_tree() {
     b = available_from[a];
+
+    d = available_dist[a];
 
     //rematch
     while (b != NONE) {
@@ -148,9 +152,16 @@ void collapse_tree() {
     }
     //clear tree
     for (a=0; a<tree_index_max; a++) {
-        tree_parent[a] = NONE;
-        tree_index[a] = NONE;
-        //TODO: add dual update
+        b = tree_list[a];
+        if(tree_index[b] & 1) {
+            //inner node
+            dual[b] -= d - available_dist[b];
+        }
+        else {
+            dual[b] += d - available_dist[b];
+        }
+        tree_parent[b] = NONE;
+        tree_index[b] = NONE;
     }
     tree_index_max = 0;
 }
@@ -183,7 +194,7 @@ void init() {
             adjacence[i][j] = NONE;
             weight[i][j] = NONE;
         }
-        dual[i] = NONE;
+        dual[i] = 0;
         matching[i] = NONE;
         tree_parent[i] = NONE;
         tree_index[i] = NONE;
@@ -265,10 +276,11 @@ void dump_tree() {
 
     printf("tree_index_max: %d\n", tree_index_max);
 
-    printf("vert\tmatch\ttreepar\ttreeind\tav_dist\tav_nxt\tav_prv\tav_fr\n");
+    printf("vert\tmatch\tdual\ttreepar\ttreeind\tav_dist\tav_nxt\tav_prv\tav_fr\n");
     for(i=0; i<MAX_VERTICES && adjacence[i][0] != NONE; i++) {
-        printf("%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", i,
-            matching[i], tree_parent[i], tree_index[i], 
+        printf("%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", i,
+            matching[i], dual[i],
+            tree_parent[i], tree_index[i], 
             available_dist[i], available_next[i], available_prev[i],
             available_from[i]);
     }
@@ -289,7 +301,7 @@ void dump_adjacency_matrix() {
     for(i=0; i<MAX_VERTICES && adjacence[i][0] != NONE; i++) {
         for(j=0; j<MAX_DEGREE && adjacence[i][j] != NONE; j++) {
             i2 = adjacence[i][j];
-            mat[i][i2] = weight[i][j];
+            mat[i][i2] = weight[i][j] - dual[i] - dual[i2];
         }
     }
 
