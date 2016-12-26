@@ -29,7 +29,6 @@ unsigned int blossom_parent[MAX_VERTICES];
 unsigned int tree_list[MAX_VERTICES];
 
 //availability double-linked list.
-unsigned int available_prev[MAX_VERTICES];
 unsigned int available_next[MAX_VERTICES]; 
 unsigned int available_from[MAX_VERTICES];
 unsigned int available_dist[MAX_VERTICES];
@@ -56,6 +55,7 @@ void grow_tree() {
     tree_list[tree_index_max] = a;
     tree_index_max ++;
     tree_parent[a] = available_from[a];
+    available_from[a] = NONE;
 
     //get b = matching[a]
     b = matching[a];
@@ -65,28 +65,28 @@ void grow_tree() {
     tree_list[tree_index_max] = b;
     tree_index_max ++;
     tree_parent[b] = a;
+    available_from[b] = NONE;
+    available_dist[b] = available_dist[a];
 
     //iterate over vertices a adjacent to b, to add to availability list
     //  if a not in available stack, 
     //  a not inner node (especially, 'to' itself) push to stack.
     for(i=0; i <= MAX_DEGREE && adjacence[b][i] != NONE; i++) {
         a = adjacence[b][i];
-        //TODO distance calculation
         d = available_dist[b] + weight[b][i] - dual[a] - dual[b];
         if (available_from[a] == NONE) {
-        //TODO if distance has decreased: update and bubble
-        //if or available_from = NONE: insertion sort
             if (tree_index[a] == NONE || ((tree_index[a]&1) == 0)) {
                 //insert into list
                 available_next[a] = available_top;
-                available_prev[a] = NONE;
-                available_prev[available_top] = a;
                 available_top = a; 
 
                 //set value
                 available_from[a] = b;
                 available_dist[a] = d;
            }
+        } else if(available_dist[a] > d) {
+            available_dist[a] = d;
+            available_from[a] = b;
         }
     }
 }
@@ -103,20 +103,36 @@ void start_tree() {
 
     //empty stack
     available_top = NONE;
+    available_dist[a] = 0;
     
     //iterate over a in adjacence[m];
     //  push to stack
-    for(i=0; i<=MAX_DEGREE && adjacence[a][i] != NONE; i++) {
+    /*for(i=0; i<=MAX_DEGREE && adjacence[a][i] != NONE; i++) {*/
+        /*b = adjacence[a][i];*/
+        /*available_next[b] = available_top;*/
+        /*available_top = b; */
+
+        /*available_from[b] = a;*/
+
+        /*d = weight[a][i] - dual[a] - dual[b];*/
+        /*available_dist[b] = d;*/
+    /*}*/
+
+    for(i=0; i <= MAX_DEGREE && adjacence[a][i] != NONE; i++) {
         b = adjacence[a][i];
-        available_next[b] = available_top;
-        available_prev[b] = NONE;
-        available_prev[available_top] = b;
-        available_top = b; 
+        d = available_dist[a] + weight[a][i] - dual[a] - dual[b];
+        if (available_from[b] == NONE) {
+                //insert into list
+                available_next[b] = available_top;
+                available_top = b; 
 
-        available_from[b] = a;
-
-        d = weight[a][i] - dual[a] - dual[b];
-        available_dist[b] = d;
+                //set value
+                available_from[b] = a;
+                available_dist[b] = d;
+        } else if(available_dist[b] > d) {
+            available_dist[b] = d;
+            available_from[b] = a;
+        }
     }
 }
 
@@ -129,6 +145,7 @@ int blossom_of(int v) {
 
 void collapse_tree() {
     b = available_from[a];
+    available_from[a] = NONE;
 
     d = available_dist[a];
 
@@ -150,7 +167,10 @@ void collapse_tree() {
         available_from[a] = NONE;
         a = available_next[a];
     }
-    //clear tree
+    //dual update and clear tree
+    //TODO: outer nodes cannot use available_dist for update, 
+    //as they could have become for blossom forming a second time.
+    //use inner partner instead.
     for (a=0; a<tree_index_max; a++) {
         b = tree_list[a];
         if(tree_index[b] & 1) {
@@ -180,6 +200,10 @@ void make_blossom(int a, int b) {
     //set tree_parent[bl] = tree_parent[a];
     
     //TODO: change tree pointers to blossom cycle
+    //TODO: collect delta(blossom), put in adj list
+    //TODO: add/decrease new available outer nodes.
+    //TODO: dual update of the blossom
+    //TODO link blossom up in tree
 }
 
 void break_blossom(int bl) {
@@ -200,7 +224,6 @@ void init() {
         tree_index[i] = NONE;
         blossom_parent[i] = NONE;
         available_next[i] = NONE;
-        available_prev[i] = NONE;
         available_from[i] = NONE;
         }
 
@@ -276,12 +299,12 @@ void dump_tree() {
 
     printf("tree_index_max: %d\n", tree_index_max);
 
-    printf("vert\tmatch\tdual\ttreepar\ttreeind\tav_dist\tav_nxt\tav_prv\tav_fr\n");
+    printf("vert\tmatch\tdual\ttreepar\ttreeind\tav_dist\tav_prv\tav_fr\n");
     for(i=0; i<MAX_VERTICES && adjacence[i][0] != NONE; i++) {
-        printf("%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", i,
+        printf("%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", i,
             matching[i], dual[i],
             tree_parent[i], tree_index[i], 
-            available_dist[i], available_next[i], available_prev[i],
+            available_dist[i], available_next[i], 
             available_from[i]);
     }
 }
@@ -295,13 +318,16 @@ void dump_adjacency_matrix() {
 
     for(i=0; i<MAX_VERTICES; i++)
         for(j=0; j<MAX_VERTICES; j++)
-            mat[i][j] = NONE;
+            mat[i][j] = 0xdead;
     
 
     for(i=0; i<MAX_VERTICES && adjacence[i][0] != NONE; i++) {
         for(j=0; j<MAX_DEGREE && adjacence[i][j] != NONE; j++) {
             i2 = adjacence[i][j];
-            mat[i][i2] = weight[i][j] - dual[i] - dual[i2];
+            d = weight[i][j] - dual[i] - dual[i2];
+            if (d < mat[i][i2]) {
+                mat[i][i2] = d;
+            }
         }
     }
 
@@ -315,7 +341,7 @@ void dump_adjacency_matrix() {
         printf("%4d", i);
         for(j=0; j<vertex_count; j++) {
 
-            if(mat[i][j] != NONE) {
+            if(mat[i][j] != 0xdead) {
                 if(matching[i] == j) {
                     printf("%3d*", mat[i][j]);
                 }
@@ -347,31 +373,48 @@ int main(int argc, char** argv) {
         //for each unpaired vertex
         if(matching[i] == NONE) {
             printf("\nstarting tree from %d\n", i);
-            a = i;
-            start_tree();
+            a = i; start_tree();
             dump_tree();
             dump_stack();
             
             while(available_top != NONE) {
-                j = available_top;
-                available_top = available_next[j];
-                available_prev[available_top] = NONE;
+                //find mininum in stack
+                dump_adjacency_matrix();
+                b = j = NONE;
+                a = available_top;
+                d = available_dist[a];
+                while (a != NONE) {
+                    if(available_dist[a] < d) {
+                        d = available_dist[a];
+                        printf(".");
+                        b = j;
+                    } 
+                    j = a;
+                    a = available_next[a];
+                }
+                //b is position before minimum, or NONE if first element.
 
-                if (matching[j] != NONE) {
+                if(b != NONE) {
+                    //unlink from list
+                    a = available_next[b];
+                    available_next[b] = available_next[a];
+                } else {
+                    a = available_top;
+                    available_top = available_next[a];
+                }
+                printf("minimum in stack is %d at pos %d, after %d\n", d, a, b);
+
+                if (matching[a] != NONE) {
                     //if matched, tree can grow
-                    printf("growing to %d\n", j);
-                    a = j;
+                    printf("growing to %d\n", a);
                     grow_tree();
-                    available_from[j] = NONE;
                 } else {
                     //if unmatched, we can collapse, done
-                    printf("collapsing to %d\n", j);
-                    a = j;
+                    printf("collapsing to %d\n", a);
                     collapse_tree();
-                    available_from[j] = NONE;
+                    dump_tree();
                     break;
                 }
-                available_from[j] = NONE;
                 dump_tree();
                 dump_stack();
             }
