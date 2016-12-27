@@ -42,7 +42,7 @@ unsigned int available_top;
 
 unsigned int vertex_count;
 
-unsigned int a, b; // pointer registers
+unsigned int a, b, c; // pointer registers
 unsigned int d; // dual value calculation register
 unsigned int i; // register to iterate over adjacency list
 
@@ -167,21 +167,32 @@ void collapse_tree() {
         available_from[a] = NONE;
         a = available_next[a];
     }
+
     //dual update and clear tree
-    //TODO: outer nodes cannot use available_dist for update, 
-    //as they could have become for blossom forming a second time.
-    //use inner partner instead.
-    for (a=0; a<tree_index_max; a++) {
+
+    //update and clear root
+    a = 0;
+    b = tree_list[a];
+    dual[b] += d;
+    tree_index[b] = NONE;
+    tree_parent[b] = NONE;
+
+    //update and clear rest of tree
+    for (a=1; a<tree_index_max; a++) {
+
+        //inner node
         b = tree_list[a];
-        if(tree_index[b] & 1) {
-            //inner node
-            dual[b] -= d - available_dist[b];
-        }
-        else {
-            dual[b] += d - available_dist[b];
-        }
+        dual[b] -= d-available_dist[b];
+
+        //corresponding outer node. use av_dist from inner node, though.
+        a = a+1;
+        c = tree_list[a];
+        dual[c] += d-available_dist[b]; 
+
         tree_parent[b] = NONE;
         tree_index[b] = NONE;
+        tree_parent[c] = NONE;
+        tree_index[c] = NONE;
     }
     tree_index_max = 0;
 }
