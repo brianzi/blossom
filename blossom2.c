@@ -123,6 +123,7 @@ void insert_or_decreasekey() {
 }
 
 void deletemin() {
+    //TODO remove disabled shit from the queue on the fly
     //a <- lowest in the queue
     //b <- available_from[a];
     //d <- available_dist[a];
@@ -169,8 +170,8 @@ void scan_outer_node() {
         c = NONE;
         while (blossom_parent[a] != NONE) {
             c = a;
-            a = blossom_parent[a];
             d -= dualstar(a);
+            a = blossom_parent[a];
         }
 
         if(tree_index[a] != current_tree_index) {
@@ -178,7 +179,7 @@ void scan_outer_node() {
             d -= dualstar(a);
         } else if(a == tree_parent[b] && c != NONE) {
             //break blossom 
-            d += dualstar(a);
+            //d -= dualstar(a);
             a = c;
         } else if((tree_m[a] & 1) == 0) {
             //make blossom
@@ -534,7 +535,7 @@ void top_loop() {
                 printf(" **** making blossom from %d\n", a);
                 make_blossom();
                 dump_graph(); 
-            } else if (tree_index[a] == current_tree_index && (tree_m[a] & 1) == 1) {
+            } else if (blossom_parent[a] != NONE) {
                 printf(" ****  breaking blossom %d\n", a);
                 dump_graph(); 
                 exit(0);
