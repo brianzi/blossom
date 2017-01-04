@@ -60,11 +60,11 @@ ADJ_IDX i, i2; // register to iterate over adjacency list
 
 int dualstar(int a) {
     int dualstar;
-    if (tree_index[a] == NONE) {
+    if (tree_index[a] == NONE  || tree_index[a] >= current_tree_index) {
         dualstar = dual[a];
     } else {
         dualstar = collapse_dist[tree_index[a]] - dist_in_tree[a];
-        dualstar *= (tree_m[a]&1 == 1) ? (-1) : 1;
+        dualstar *= ((tree_m[a]&1) == 1) ? (-1) : 1;
         dualstar += dual[a];
     }
     return dualstar;
@@ -183,7 +183,7 @@ void scan_outer_node() {
             a = c;
         } else if((tree_m[a] & 1) == 0) {
             //make blossom
-            d -= dual[a] + dist_in_tree[a] + dist_in_tree[b];
+            d -= dual[a] - dist_in_tree[a] + dist_in_tree[b];
             d >>= 1;
             //TODO b must have been in stack, remove
             available_from[b] = NONE;
@@ -212,14 +212,8 @@ void grow_tree() {
 
     //deferred dual update
     if (tree_index[a] != NONE) {
-        d = collapse_dist[tree_index[a]];
-        if ((tree_m[a]&1) == 1) {
-            dual[a] -= d - dist_in_tree[a];
-            dual[b] += d - dist_in_tree[b];
-        } else {
-            dual[a] += d - dist_in_tree[a];
-            dual[b] -= d - dist_in_tree[b];
-        }
+        dual[a] = dualstar(a);
+        dual[b] = dualstar(b);
     }
     
     tree_index[a] = current_tree_index;
@@ -241,9 +235,12 @@ void collapse_tree() {
     dist_in_tree[a] = d;
     
     while (a != NONE) {
+        while (blossom_parent[b] != NONE) b = blossom_parent[b];
         matching[a] = b;
         matching[b] = a;
         a = tree_parent[b];
+        if (a == NONE) break;
+        while (blossom_parent[a] != NONE) a = blossom_parent[a];
         b = tree_parent[a];
     }
 
@@ -261,7 +258,7 @@ void make_blossom() {
 
     //build a blossom from the plus vertex a to the plus
     
-    //TODO go through the blossom the first time:
+    //go through the blossom the first time:
     //collect adjacent nodes (not pseudo!)
     //update duals to make blossom tight
     //reverse tree structure on one branch
@@ -275,6 +272,7 @@ void make_blossom() {
     i2 = 0;
     while (a != b) {
         if(tree_m[a] > tree_m[b]) {
+            printf("make blossom round 1: doing %d as a\n", a);
             tree_index[a] = max_tree_index;
             blossom_parent[a] = vertex_count;
             available_from[a] = NONE;
@@ -283,13 +281,16 @@ void make_blossom() {
             tree_parent[a] = c;
             c = a;
             a = c2;
+            while(blossom_parent[a] != NONE) a = blossom_parent[a];
+
         } else {
+            printf("make blossom round 1: doing %d as b\n", b);
             tree_index[b] = max_tree_index;
             blossom_parent[b] = vertex_count;
             available_from[b] = NONE;
 
             b = tree_parent[b];
-            while (blossom_parent[b] != NONE) b = blossom_parent[b];
+            while(blossom_parent[b] != NONE) b = blossom_parent[b];
         }
     }
 
@@ -297,23 +298,23 @@ void make_blossom() {
     //insert into blossom 
     tree_index[a] = max_tree_index;
     blossom_parent[a] = vertex_count;
+    b = tree_parent[a];
     tree_parent[a] = c;
 
     //set distance for deferred dual update
     collapse_dist[max_tree_index] = d - dist_in_tree[a];
 
 
-    b = matching[a];
 
     //match blossom and insert into tree
     matching[vertex_count] = b;
     tree_index[vertex_count] = current_tree_index;
-    tree_parent[vertex_count] = matching[b];
-    matching[b] = vertex_count;
+    tree_parent[vertex_count] = b;
     tree_m[vertex_count] = tree_m[a];
 
     if (b != NONE) {
         dist_in_tree[vertex_count] = dist_in_tree[b];
+        matching[b] = vertex_count;
     } else {
         dist_in_tree[vertex_count] = 0;
     }
@@ -335,8 +336,8 @@ void make_blossom() {
                 weight[vertex_count][i2] = d;
                 i2 += 1;
             } else {
-                if(weight[vertex_count][i2] < d) {
-                    weight[vertex_count][i2] = d;
+                if(weight[vertex_count][delta_idx[b]] > d) {
+                    weight[vertex_count][delta_idx[b]] = d;
                 }
             }
         }
@@ -348,6 +349,30 @@ void make_blossom() {
     scan_outer_node();
     vertex_count += 1;
     max_tree_index += 1;
+}
+
+void break_blossom() {
+    //a is node in blossom
+    //b is av_from[a] is matching of blossom
+    //d is distance
+    
+    adjacence[blossom_parent[a]][0] = NONE;
+    
+    //rematch
+    c = a;
+    do {
+        matching[b] = a;
+        matching[a] = b;
+        blossom_parent[a] = NONE;
+        b = tree_parent[a];
+        a = tree_parent[b];
+        blossom_parent[b] = NONE;
+    } while(b != c);
+
+    collapse_dist[current_tree_index] = d;
+    current_tree_index = max_tree_index ++;
+    current_tree_m = 0;
+
 }
 
 void print_state() {
@@ -460,22 +485,7 @@ void dump_adjacency_matrix() {
     for(i=0; i<MAX_VERTICES && adjacence[i][0] != NONE; i++) {
         for(j=0; j<MAX_DEGREE && adjacence[i][j] != NONE; j++) {
             i2 = adjacence[i][j];
-            d = weight[i][j] - dual[i] - dual[i2];
-
-            if(tree_index[i] != NONE) {
-                if((tree_m[i] & 1) == 1)
-                    d += collapse_dist[tree_index[i]] - dist_in_tree[i];
-                else
-                    d -= collapse_dist[tree_index[i]] - dist_in_tree[i];
-            }
-
-            if(tree_index[i2] != NONE) {
-                if((tree_m[i2] & 1) == 1)
-                    d += collapse_dist[tree_index[i2]] - dist_in_tree[i2];
-                else
-                    d -= collapse_dist[tree_index[i2]] - dist_in_tree[i2];
-            }
-
+            d = weight[i][j] - dualstar(i) - dualstar(i2);
 
             if (d < mat[i][i2]) {
                 mat[i][i2] = d;
@@ -519,6 +529,7 @@ void top_loop() {
         printf(" **** starting tree at %d\n", max_unpaired);
 
         b = max_unpaired;
+        dual[b] = dualstar(b);
         tree_index[b] = current_tree_index;
         scan_outer_node();
 
@@ -537,8 +548,8 @@ void top_loop() {
                 dump_graph(); 
             } else if (blossom_parent[a] != NONE) {
                 printf(" ****  breaking blossom %d\n", a);
-                dump_graph(); 
-                exit(0);
+                break_blossom();
+                clear_tree_and_stack();
             } else if (matching[a] == NONE) {
                 printf(" **** collapsing to %d\n", a);
                 collapse_tree();
@@ -550,6 +561,7 @@ void top_loop() {
             }
             print_state();
             print_stack();
+            dump_adjacency_matrix();
 
         }
         while(matching[max_unpaired] != NONE || blossom_parent[max_unpaired] != NONE) max_unpaired ++ ;
