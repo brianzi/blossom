@@ -301,6 +301,8 @@ void make_blossom() {
     //insert into blossom 
     tree_index[a] = max_tree_index;
     blossom_parent[a] = vertex_count;
+    available_from[a] = NONE;
+
     b = tree_parent[a];
     tree_parent[a] = c;
 
