@@ -60,7 +60,7 @@ ADJ_IDX i, i2; // register to iterate over adjacency list
 
 int dualstar(int a) {
     int dualstar;
-    if (tree_index[a] == NONE  || tree_index[a] >= current_tree_index) {
+    if (tree_index[a] == NONE  || tree_index[a] == current_tree_index) {
         dualstar = dual[a];
     } else {
         dualstar = collapse_dist[tree_index[a]] - dist_in_tree[a];
@@ -265,6 +265,9 @@ void make_blossom() {
     //in principle: remove nodes in blossom from stack
     
 
+    while(blossom_parent[a] != NONE) a = blossom_parent[a];
+    while(blossom_parent[b] != NONE) b = blossom_parent[b];
+
     //this is the new dual update domain
 
     c = b;
@@ -302,7 +305,8 @@ void make_blossom() {
     tree_parent[a] = c;
 
     //set distance for deferred dual update
-    collapse_dist[max_tree_index] = d - dist_in_tree[a];
+    //collapse_dist[max_tree_index] = d - dist_in_tree[a];
+    collapse_dist[max_tree_index] = d;
 
 
 
@@ -311,12 +315,11 @@ void make_blossom() {
     tree_index[vertex_count] = current_tree_index;
     tree_parent[vertex_count] = b;
     tree_m[vertex_count] = tree_m[a];
+    dist_in_tree[vertex_count] = d;
 
     if (b != NONE) {
-        dist_in_tree[vertex_count] = dist_in_tree[b];
         matching[b] = vertex_count;
     } else {
-        dist_in_tree[vertex_count] = 0;
     }
 
 
@@ -379,7 +382,7 @@ void print_state() {
     int i;
 
     printf("\tvert\tmatch\tdual\tdual*\ttreepar\ttreeidx\ttree_m\tdist_it\tbl_par\tav_dist\tav_nxt\tav_fr\tav_idx\tdelta\n");
-    for(i=0; i<MAX_VERTICES && adjacence[i][0] != NONE; i++) {
+    for(i=0; i<vertex_count; i++) {
 
         printf("\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", i,
             matching[i], dual[i], dualstar(i),
@@ -482,7 +485,7 @@ void dump_adjacency_matrix() {
             mat[i][j] = 0xdead;
     
 
-    for(i=0; i<MAX_VERTICES && adjacence[i][0] != NONE; i++) {
+    for(i=0; i<vertex_count; i++) {
         for(j=0; j<MAX_DEGREE && adjacence[i][j] != NONE; j++) {
             i2 = adjacence[i][j];
             d = weight[i][j] - dualstar(i) - dualstar(i2);
@@ -641,4 +644,6 @@ int main(int argc, char** argv) {
 
 
 }
+
+
 
