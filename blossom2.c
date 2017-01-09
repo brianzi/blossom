@@ -230,6 +230,7 @@ void collapse_tree() {
     //a: available node
     //b: av_from[a]
     //d: av_dist[a]
+    dual[a] = dualstar(a);
     tree_index[a] = current_tree_index;
     tree_m[a] = current_tree_m++;
     dist_in_tree[a] = d;
@@ -470,7 +471,7 @@ void dump_graph() {
 
     printf("vertex count: %d\n", vertex_count);
 
-    for(i=0; i<MAX_VERTICES && adjacence[i][0] != NONE; i++) {
+    for(i=0; i < vertex_count; i++)  {
         printf("%d:\t", i);
         for(j=0; j<MAX_DEGREE && adjacence[i][j] != NONE; j++) {
             printf("%d, %d;\t", adjacence[i][j], weight[i][j]);
