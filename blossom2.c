@@ -150,6 +150,8 @@ void deletemin() {
         available_top = available_next[b];
     }
 
+    available_index[b] = NONE;
+
     a = b;
     b = available_from[a];
 }
