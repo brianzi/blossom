@@ -527,6 +527,12 @@ int dump_adjacency_matrix() {
                     printf("%3d!", mat[i][j]);
                     printf("\x1B[0m"); //reset
                     if ((mat[i][j] & (-2)) != 0) error = 1;
+                } 
+                else if (mat[i][j] < 0) {
+                    printf("\x1B[31m"); //red
+                    printf("%3d", mat[i][j]);
+                    printf("\x1B[0m");
+                    error = 1;
                 }
                 else { 
                     printf("%4d", mat[i][j]);
@@ -573,12 +579,12 @@ void top_loop() {
                 make_blossom();
                 dump_graph(); 
             } else if (blossom_parent[a] != NONE) {
-                if (blossom_parent[a] == b) {
+                if (blossom_parent[blossom_parent[a]] == NONE) {
                     printf(" ****  breaking blossom %d\n", a);
                     break_blossom();
                     clear_tree_and_stack();
                 } else {
-                    printf(" **** ignoring because double in blossom %d\n", a);
+                    printf(" **** ignoring break because blossom in blossom %d\n", a);
                 }
             } else if (matching[a] == NONE) {
                 printf(" **** collapsing to %d\n", a);
