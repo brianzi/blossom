@@ -289,13 +289,18 @@ void make_blossom() {
         } else {
             printf("make blossom round 1: doing %d as b\n", b);
             tree_index[b] = max_tree_index;
+
             blossom_parent[b] = vertex_count;
             available_from[b] = NONE;
+
+            while (blossom_parent[tree_parent[b]] != NONE) tree_parent[b] = blossom_parent[tree_parent[b]];
 
             b = tree_parent[b];
             while(blossom_parent[b] != NONE) b = blossom_parent[b];
         }
     }
+
+    printf("a: %d, b: %d\n", a, b);
 
     //a is now the stem of the blossom
     //insert into blossom 
@@ -324,6 +329,7 @@ void make_blossom() {
     } else {
     }
 
+    print_state();
 
 
     i2 = 0;
@@ -543,7 +549,6 @@ void top_loop() {
 
         while(available_top != NONE)  {
             deletemin();
-            //collapse_dist[current_tree_index] = d;
 
             if (b == NONE) {
                 printf(" **** ignoring %d\n", a);
