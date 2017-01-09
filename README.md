@@ -109,43 +109,44 @@ Alternative Plan
 After some consideration, it might be worthwile to think about a more minimal
 data storage model; computations are often cheap.
 
-We store a list of vertices, and for each vertex we store a list of
-neighboring vertices, together with the weight of the corresponding edges,
-which is not modified after creation. This is the input to the algorithm,
-so there is no way around this.
+In this model, pointers always refer to vertices, the concept of "edges" 
+is not directly mirrored in the data model. Each pointer can take a special value NONE.
+In fact, we store a list of vertices, and for each vertex we store a list of
+adjacent vertices, together with the weight of the corresponding edges,
+which is the input to the problem. 
+No vertex adjacency list is ever modified after creation. 
+This list is the input to the algorithm, but it might be extended by blossom
+pseudo vertices at runtime.
 
-Blossoms are also created as vertices. For each vertex, we store a "blossom
-parent", which is set to the blossom vertex the vertex is part of.  For
-breaking a blossom, we thus also want to store a list of all the blossom
-children; we only need to reset their blossom pointer to NULL.  Essentially,
-we are thus storing the laminar covering as a doubly linked tree.
+For each vertex, we store a "blossom
+parent", which is set to the blossom vertex the vertex is part of, NONE otherwise.  
 
-Instead, it might be possible to not store the children, just mark blossom
-vertices as destroyed somehow, and unlink the children when they ever try to
-access their parent and note its destruction?
-
-Furthermore, for each vertex we store its partner in the matching, and its
+Furthermore, for each vertex we store a pointer to its partner in the matching, and its
 parent in the tree.
 
-The matching is a matching in M prime, that is, matching[v] must 
-have the same blossom parent as v.
+The matching is a matching in M prime, that is, matching[v] is only valid 
+if blossomparent[v] is NONE. (nb: for clarity, I set matching to NONE if the vertex is
+in a blossom, I don't think this is strictly required)
 
-If a vertex has a blossom parent, it will never be part of the tree. At the
-moment it becomes part of a blossom, its tree pointer nicely traces the
-blossom towards its stem. We thus could use the tree pointer for restoring
-blossoms. It would be the same idea as above: When making a blossom, revert
-one branch in direction, so that the tree pointer forms a circuit tracing
-the blossom. When restoring a blossom, start with the newly paired vertex
-and re-pair by going around the cycle once. 
+We furthermore maintain a tree structure, so 
+for each vertex we store a pointer treeparent[v].
+It is NONE for the root vertex or if the vertex is not in the tree.
+NOTE: this pointer is not guaranteed to be in m'. If b = blossomparent[treeparent[v]] 
+is not NONE, then blossom parent is the actual parent. 
+NOTE: It might be actually be smart to add logic that guarantees this.
 
+Thus, if blossomparent[v] is not NONE, v will never be in a tree.
+In this case, treeparent[v] has a secondary meaning: 
+It contains a pointer to its blossom sibling, so that following treeparent
+inside a blossom is a circular linked list along the blossom. The direction is arbitrary.
 
-It might also be a good idea to maintain a monotonous function I(v) for each 
-element in the tree, i.e. I(v) is decreasing decreasing towards the root. 
-We furthermore require I(v) has the same parity as v, i.e. even for 
-outer nodes, odd for inner nodes. When adding to the tree, just add 
-a running counter to the two new added nodes.
+Furthermore, we maintain a monotonous function treeindex(v) = I[v] for each 
+element in the tree, i.e. I(v) is decreasing towards the root. 
+We furthermore require I(v) reflects the parity of v in the tree, i.e. even for 
+outer nodes, odd for inner nodes. When adding new vertices to the tree, these properties
+are maintained by just assigning values of a running counter to each new added vertex.
 Besides identifying nodes as even or odd,
-this function should allow for easy finding of common ancestors:
+this function should allows for easy finding of common ancestors, and thus efficient finding of blossoms.
 
 ``` 
     while w!=v: 
@@ -155,12 +156,12 @@ this function should allow for easy finding of common ancestors:
         w = parent(w)
       # v and w traverse the cycle, do something to them...  
 ```
-When creating a blossom, set its index to the index of the stem, preserving the decreasing property. 
+When contracting a blossom, we set its index to the index of the stem, preserving the decreasing property. 
 
 When breaking a blossom, maintaining the tree property is harder, as 
 one vertex (the blossom) is expanded into a path.
 I have several ideas: a) destroy the tree after breaking, 
-rebuild from the same node.
+rebuild from the same root.
 This will build the same tree, but with new I(v).
 b) When adding a blossom to the tree, increase the counter by the 
 number of vertices in the blossom, instead of 1. Requires keeping 
@@ -185,85 +186,78 @@ Making blossoms
 ---------------
 
 When making a new blossom B, we create a new (pseudo-)vertex in the
-vertex list. We then need to insert Delta(B) in the adjacency list.
-Finding delta(B) is a bit difficult. The easiest way is a marker on
-adjacency edges: We run through the blossom once, toggling a one-bit marker
-on all vertices adjacent to each vertex in the blossom.
-After doing this to all edges, the marked edges are adjacent to the
-new blossom.
-Note that we only ever take real vertices into the adjacency list.
+vertex list. We then need to insert Delta(B) in the adjacency list,
+and also add the corresponding reduced weight. 
+Note that we only ever take real vertices into the adjacency list,
+running up the blossomparent when required.
 
-The blossom parent of each vertex in the blossom is set to the
-new pseudo-vertex.
+We construct the blossom in two steps: In round one, we
+use treeindex as described above to find all nodes in the 
+blossom, link their treeparents up to a cyclic list and 
+set their blossom parent; we also do the dual update here which 
+makes all edges in the blossom tight.
 
-When constructing the blossom, we also need to create a structure that
-enables us to restore the blossom later, and add it to the tree. The best
-structure would be a double-linked circular list, and a pointer 
-`tree_up` and `tree_down` from the pseudo-vertex to the (pseudo-)vertex in the blossom that is 
-currently the source for the location in the tree to the outside. 
+In the next round, we follow the cyclic list to find the adjacency list of the blossom.
+In order to find it, we need to keep a temporary pointer for each vertex,
+which contains the position of each vertex in the adjacency list of the new blossom.
+This allows to only insert each vertex once even if it is adjacent to several 
+values.
 
-Then breaking the blossom simply starts from the treedown partner,
-building tree and rematching while walking up in both directions
-along the blossom, until the treeup partner is found.
-
-If we only had a singly linked list, this should still be possible in
-one round.
-
-Actually, treeup can be found easily, by taking treeparent of
-the upper vertex and following it to the second to last tier in the
-laminar tree.
-
-Treedown can be found in the same way at the instance of 
-addition to the tree. At that moment, the break-blossom event has to be 
-added to the queue anyway, and the treedown pointer could be stored
-in the availablefrom field of the queue. Being in a blossom also 
-identifies this event in the queue, the other events.
+The weights of the newly created vertices are reduced by the dual 
+of the vertex in the blossom and set to the smallest weight if several edges exist.
 
 Events in the availability queue
 --------------------------------
 
-The queue contains a distance key, a vertex v and and avfrom field.
-An element is technically considered in the queue if avfrom and avdist are
-set.
+We furthermore keep a priority queue, from which the lowest element is
+popped at the top-level loop to determine the next action to the tree.
+
+At the moment, I maintain the queue as an unsorted linked list (pop is O(n)).
+The queue contains a key avdist, a vertex v and and avfrom field.
+An element is technically considered in the queue if avfrom is not NONE, 
+and avdist is the corresponding key.
+
+At any point, a vertex v can only be in the queue if it is top-level, i.e. blossomparent[v] = NONE.
 
 Four actions are associated with each element in the following way. 
 
-avfrom not in tree, paired: grow tree
-avfrom not in tree, unpaired: collapse
-avfrom in tree as plus: make blossom
-avfrom in blossom: break blossom 
+v not in tree, paired: grow tree. avfrom is a plus node in the tree
+v not in tree, unpaired: collapse. avfrom is a plus node in the tree
+v in tree as plus: make blossom. avfrom is (another) plus node in the tree.
+v in tree as minus: break blossom. avfrom is the node in the blossom which will be paired outside the blossom after collapse.
 
-for the last case, not that the blossom v in this case is an inner node
-in the tree, and thus cannot be available for any other case.
+note that in case 3, the situation is symmetric; and we will have to ambiguate this situation.
+This will be done is such a way (see below, outer node scan) that v will be 
+the node that is added to the tree second 
 
-note that a vertex available for growing might be available again
-immediately for making a blossom. However, the vertex it is available from
-will vice versa also become available from v itself. 
-We ambiguate this by saying that for making a blossom, 
-v is the vertex with lower I(v) and avfrom is the vertex with higher I(v).
 
- 
-Outer edges
+Outer node scan
 ---------------
 
-Vertices that are reachable from an outer node could be "added" to the tree,
-if they are a) not in the tree, or b) an outer edge.
-In case a) the tree is grown, in case b) a blossom is formed.
+The actual main work at each step is the "outer node scan".
+When the tree is not collapsed, an outer nodes is added created to the tree.
+As a consequence, new vertices are available, and their distance to 
+the root must be calculated and new events with the corresponding distances are added to the tree.
+This is done in the following way:
+
+for a in the adjacency list of the new outer node b:
+  - get reduced weight from a to b.
+  - run up in blossom list from a to toplevel to aprime, reducing the weight by blossom duals that a sits in.
+  - if aprime is not in tree, insert or decreasekey aprime to dist[b] + reduces weight. 
+    - (will lead to grow)
+  - if aprime is in tree as plus, insert or decreasekey aprime to dist[b] + (reduced weight)/2. 
+    - (will lead to makeblossom)
+  - if aprime is in tree as minus and the treeparent of b and a blossom, insert or decreasekey aprime to dist[b] + dual[aprime].
+    - avfrom is not set to b, but to the immidiate element of the blossom found while running up the blossom tree in step 1.
+    - (will lead to break blossom)
+  - if aprime is in tree as minus otherwise, ignore.
 
 
-For that, they are held in a linked data structure.
-If no weight calculation is performed, a stack (i.e. simple linked list) is
-sufficient. If weight calculation is performed, the data structure must be
-a heap that supports `decrease_key`. A Fibonacci heap is known to be best 
-asymptotically; a simpler structure might be preferrable for small sizes. 
-
-For now, I am using an unsorted linked list, with O(1) insert and decreasekey, but O(n) pop.
-
-
+ 
 Dual updates
 ------------
 
-Before collapsing the tree, the root is unpaired, and its dual variable is 0.
+The tree starts with a single root element as a plus node.
 
 Then, a tree is build, and after collapsing, the dual variables on the tree
 are updated so that all edges in the tree are tight.
@@ -287,4 +281,13 @@ One might shortcut this because previously collapsed trees
 tend to leave big chunks of zero-distance nodes, but this is the general idea of having several trees.
 
 
+Idea: Lazy dual updates: Currently, after the collapse of each tree, 
+the dual is updated on the whole tree. Each node requires d(v,r), 
+which is calculated when the node is added to the availability queue, and
+d(o, n2) (see above) which is calculated at collapse time. 
+We could store the d(o, n2) which where found together with 
+a "tree serial number", and tag each node with the tree serial number it
+was last in. Then the dual update can be performed not at collapse time,
+but when it is considered next (when it is added to the 
+availability queue for the next time).
 
