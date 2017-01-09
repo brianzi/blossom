@@ -329,7 +329,6 @@ void make_blossom() {
     } else {
     }
 
-    print_state();
 
 
     i2 = 0;
@@ -480,13 +479,15 @@ void dump_graph() {
     }
 }
 
-void dump_adjacency_matrix() {
+int dump_adjacency_matrix() {
     int i, j, i2;
     int d;
 
 
     // generate the dense adjacency matrix
     int mat[MAX_VERTICES][MAX_VERTICES];
+
+    int error = 0;
 
     for(i=0; i<MAX_VERTICES; i++)
         for(j=0; j<MAX_VERTICES; j++)
@@ -516,7 +517,16 @@ void dump_adjacency_matrix() {
 
             if(mat[i][j] != 0xdead) {
                 if(matching[i] == j) {
+                    printf("\x1B[32m"); //green
                     printf("%3d*", mat[i][j]);
+                    printf("\x1B[0m"); //reset
+                    if ((mat[i][j] & (-2)) != 0) error = 1;
+                }
+                else if(tree_parent[i] == j && blossom_parent[i] != NONE) {
+                    printf("\x1B[33m"); //green
+                    printf("%3d!", mat[i][j]);
+                    printf("\x1B[0m"); //reset
+                    if ((mat[i][j] & (-2)) != 0) error = 1;
                 }
                 else { 
                     printf("%4d", mat[i][j]);
@@ -528,6 +538,12 @@ void dump_adjacency_matrix() {
         }
         printf("\n");
     }
+
+    if(error != 0)
+        printf("error!\n");
+
+    return error;
+
 }
 
 void top_loop() {
@@ -590,66 +606,7 @@ int main(int argc, char** argv) {
 
     top_loop();
 
-    dump_adjacency_matrix();
-
-    /*printf("\n");*/
-
-    /*clear_tree_and_stack();*/
-    /*max_unpaired = 0;*/
-    /*b = max_unpaired;*/
-    /*tree_index[b] = current_tree_index;*/
-    /*scan_outer_node();*/
-
-    /*print_state();*/
-    /*print_stack();*/
-
-    /*deletemin();*/
-    /*collapse_tree();*/
-    /*clear_tree_and_stack();*/
-    /*while(matching[++max_unpaired] != NONE);*/
-
-    /*print_state();*/
-
-    /*b = max_unpaired;*/
-    /*tree_index[b] = current_tree_index;*/
-    /*scan_outer_node();*/
-
-    /*print_state();*/
-    /*print_stack();*/
-    
-
-    /*deletemin();*/
-    /*collapse_tree();*/
-    /*clear_tree_and_stack();*/
-    /*while(matching[++max_unpaired] != NONE);*/
-
-    /*print_state();*/
-
-    /*b = max_unpaired;*/
-    /*tree_index[b] = current_tree_index;*/
-    /*scan_outer_node();*/
-
-    /*print_state();*/
-    /*print_stack();*/
-
-    /*deletemin();*/
-    /*grow_tree();*/
-    /*scan_outer_node();*/
-
-    /*print_state();*/
-    /*print_stack();*/
-
-    /*deletemin();*/
-    /*collapse_tree();*/
-    /*clear_tree_and_stack();*/
-    /*while(matching[++max_unpaired] != NONE);*/
-
-    /*print_state();*/
-
-
-
-
-
+    return dump_adjacency_matrix();
 }
 
 
