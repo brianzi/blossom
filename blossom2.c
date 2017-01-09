@@ -567,15 +567,19 @@ void top_loop() {
             deletemin();
 
             if (b == NONE) {
-                printf(" **** ignoring %d\n", a);
+                printf(" **** ignoring, because removed from queue %d\n", a);
             } else if (tree_index[a] == current_tree_index && (tree_m[a] & 1) == 0) {
                 printf(" **** making blossom from %d\n", a);
                 make_blossom();
                 dump_graph(); 
             } else if (blossom_parent[a] != NONE) {
-                printf(" ****  breaking blossom %d\n", a);
-                break_blossom();
-                clear_tree_and_stack();
+                if (blossom_parent[a] == b) {
+                    printf(" ****  breaking blossom %d\n", a);
+                    break_blossom();
+                    clear_tree_and_stack();
+                } else {
+                    printf(" **** ignoring because double in blossom %d\n", a);
+                }
             } else if (matching[a] == NONE) {
                 printf(" **** collapsing to %d\n", a);
                 collapse_tree();
