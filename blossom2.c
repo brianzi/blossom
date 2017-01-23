@@ -164,6 +164,9 @@ void scan_outer_node() {
     for(i = 0; i <= MAX_VERTICES && adjacence[b][i] != NONE; i++) {
         a = adjacence[b][i];
 
+        printf("scanning a=%d from b=%d\n", a, b);
+
+
         delta_idx[a] = NONE;
 
         d = weight[b][i] - dual[b];
@@ -178,19 +181,23 @@ void scan_outer_node() {
 
         if(tree_index[a] != current_tree_index) {
             //a not in tree
+            printf("not in tree\n");
             d -= dualstar(a);
         } else if(a == tree_parent[b] && c != NONE) {
             //break blossom 
             //d -= dualstar(a);
+            printf("break blossom\n");
             a = c;
         } else if((tree_m[a] & 1) == 0) {
             //make blossom
             d -= dual[a] - dist_in_tree[a] + dist_in_tree[b];
             d >>= 1;
             //TODO b must have been in stack, remove
+            printf("make blossom\n");
             available_from[b] = NONE;
         } else {
             //ignore
+            printf("ignore\n");
             continue;
         }
 

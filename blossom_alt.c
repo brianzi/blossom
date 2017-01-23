@@ -271,7 +271,11 @@ void make_blossom() {
     //collect adjacent nodes (not pseudo!)
     //update duals to make blossom tight
     //reverse tree structure on one branch
-    //TODO: works if all in a branch, still not working in general
+    //FIXME: here we are running along the tree structure
+    //the tree_parent pointer is never guaranteed to 
+    //point at a blossom directly, it might point to an 
+    //element in the blossom. In the b branch, the tree pointer
+    //is assumed to be top_level already, this must be handled.
     while(1) {
         if(tree_index[a] >= tree_index[b]) {
             printf("make blossom round1: doing %d as a, b is %d\n", a, b);
@@ -293,11 +297,11 @@ void make_blossom() {
             }
 
             c2 = tree_parent[a];
+            while (blossom_parent[c2] != NONE) 
+                c2 = blossom_parent[c2];
             tree_parent[a] = c;
             c = a;
             a = c2;
-            while (blossom_parent[a] != NONE) 
-                a = blossom_parent[a];
 
         }
         if(tree_index[a] < tree_index[b]) {
@@ -317,6 +321,7 @@ void make_blossom() {
             b = tree_parent[b];
             while (blossom_parent[b] != NONE)
                 b = blossom_parent[b];
+
         }
     }
     tree_parent[a] = c;
@@ -328,7 +333,9 @@ void make_blossom() {
     matching[vertex_count] = matching[b];
     matching[matching[b]] = vertex_count;
     tree_parent[vertex_count] = matching[b];
+    available_dist[vertex_count] = available_dist[matching[b]];
 
+    dump_tree();
 
     //b now is left at stem node, a iterates around a second time
     //to build adjacency list
@@ -349,13 +356,13 @@ void make_blossom() {
                     delta_tag[b] = i2 ;
                     adjacence[vertex_count][i2] = b;
                     weight[vertex_count][i2] = d; 
+                    i2 += 1;
                 } else  {
                     if (weight[vertex_count][i2] < d) {
                         printf("reducing edge to %d\n", b);
                         weight[vertex_count][i2] = d;
                     }
                 }
-                i2 += 1;
             }
         }
 
@@ -378,13 +385,16 @@ void make_blossom() {
     b = vertex_count;
 
     //blossom is plus, so we insert new outer nodes into av stack
-    //TODO: setting blossom availablity?
+    //TODO blossom is a new outer node, most certainly 
+    //it can become available for making a new blossom, 
+    //we must handle this the same way as in grow_tree for sure
     for(i=0; i <= MAX_DEGREE && adjacence[b][i] != NONE; i++) {
         a = adjacence[b][i];
+        delta_tag[a] = NONE;
 
 
         //distance if other node is not in tree
-        d = weight[b][i] - dual[a] - dual[b];
+        d = available_dist[b] + weight[b][i] - dual[a] - dual[b];
 
         //if a is in blossom, run up to blossom
         c = NONE;
