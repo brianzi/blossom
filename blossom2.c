@@ -1,6 +1,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#define DO_DUMP_GRAPH
+#define DO_PRINT_STACK
+#define DO_DUMP_ADJACENCY_MATRIX
+
+
 
 #define MAX_VERTICES (100)
 #define MAX_DEGREE (20)
@@ -58,8 +63,8 @@ N a, b, c; // pointer registers
 W d; // dual value calculation register
 ADJ_IDX i, i2; // register to iterate over adjacency list
 
-int dualstar(int a) {
-    int dualstar;
+W dualstar(N a) {
+    W dualstar;
     if (tree_index[a] == NONE  || tree_index[a] == current_tree_index) {
         dualstar = dual[a];
     } else {
@@ -422,7 +427,7 @@ void print_state() {
     printf("  current_tree_m=%d\n", current_tree_m);
     printf("  current_tree_index=%d\n", current_tree_index);
     printf("  available_top=%d\n", available_top);
-    printf("  max_unpaired=%d\n", max_unpaired);
+    printf("  max_unpaired=%d\n\n", max_unpaired);
 
 }
 
@@ -462,6 +467,7 @@ void read_file(char* filename) {
 }
 
 void print_stack() {
+#ifdef DO_PRINT_STACK
     int max_recursion=20;
     int i;
     printf("available queue: ");
@@ -473,23 +479,27 @@ void print_stack() {
         printf(" %d (from %d, dist %d)", i, available_from[i], available_dist[i]);
     }
     printf("\n");
+#endif
 }
 
 void dump_graph() {
+#ifdef DO_DUMP_GRAPH
     int i, j;
 
     printf("vertex count: %d\n", vertex_count);
 
     for(i=0; i < vertex_count; i++)  {
-        printf("%d:\t", i);
+        printf("DUMPGRAPH: %d:\t", i);
         for(j=0; j<MAX_DEGREE && adjacence[i][j] != NONE; j++) {
             printf("%d, %d;\t", adjacence[i][j], weight[i][j]);
         }
         printf("\n");
     }
+#endif
 }
 
 int dump_adjacency_matrix() {
+#ifdef DO_DUMP_ADJACENCY_MATRIX
     int i, j, i2;
     int d;
 
@@ -559,7 +569,7 @@ int dump_adjacency_matrix() {
         printf("error!\n");
 
     return error;
-
+#endif
 }
 
 void top_loop() {
@@ -584,10 +594,9 @@ void top_loop() {
 
             if (b == NONE) {
                 printf(" **** ignoring, because removed from queue %d\n", a);
-            } else if (tree_index[a] == current_tree_index && (tree_m[a] & 1) == 0) {
+            } else if (tree_index[a] == current_tree_index && (tree_m[a] & 1) == 0 && (a != b)) {
                 printf(" **** making blossom from %d\n", a);
                 make_blossom();
-                dump_graph(); 
             } else if (blossom_parent[a] != NONE) {
                 if (blossom_parent[blossom_parent[a]] == NONE) {
                     printf(" ****  breaking blossom %d\n", a);
@@ -605,6 +614,7 @@ void top_loop() {
                 grow_tree();
                 scan_outer_node();
             }
+            dump_graph();
             print_state();
             print_stack();
             dump_adjacency_matrix();
@@ -624,9 +634,14 @@ int main(int argc, char** argv) {
     }
     dump_graph();
 
+
     top_loop();
 
+
     return dump_adjacency_matrix();
+
+    
+
 }
 
 
