@@ -26,11 +26,11 @@ def random_non_bipartite(n=10):
             j = i
             while j == i:
                 j = np.random.randint(n)
-            pairs[frozenset([i, j])] = np.random.randint(10)
+            pairs[frozenset([i, j])] = 4*np.random.randint(20)
     return pairs.items()
 
 
-def make_file(fn="rnd.dat", n=8):
+def make_file(fn="rnd.dat", n=16):
     with open(fn, "w") as f:
         pairs = random_non_bipartite(n)
         for s, w in pairs:
@@ -38,7 +38,7 @@ def make_file(fn="rnd.dat", n=8):
 
 
 if __name__ == "__main__":
-    for i in range(200):
+    for i in range(10000):
         
         make_file(n=10)
         p = subprocess.run(["./a.out", "rnd.dat"], timeout=2, stdout=subprocess.DEVNULL)

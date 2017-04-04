@@ -16,7 +16,7 @@ cdef:
     struct node:
         int index
 
-        int y
+        float y
 
         edge *pair
 
@@ -31,7 +31,8 @@ cdef:
     struct edge:
         int index
 
-        int slack
+        float slack
+        float ds_at_seen
         
         node *node_plus
         node *node_minus
@@ -132,7 +133,7 @@ cdef class Graph:
 
         return index
 
-    def add_edge(self, index1, index2):
+    def add_edge(self, index1, index2, slack=None):
         cdef node *n1
         cdef node *n2
         cdef edge *e
@@ -147,7 +148,7 @@ cdef class Graph:
         e.index = self.len_edges
         self.len_edges += 1
 
-        e.slack = 0
+
 
         e.tag = 0
 
@@ -163,6 +164,13 @@ cdef class Graph:
         n2.edge_list[n2.n_edges] = e
         n2.n_edges += 1
 
+        if slack != None:
+            e.slack = slack
+        else:
+            e.slack = (self.pos_x[n1.index] - self.pos_x[n2.index])**2
+            e.slack += (self.pos_y[n1.index] - self.pos_y[n2.index])**2
+            e.slack = e.slack**0.5
+
         return e.index
 
     def show(self):
@@ -174,7 +182,8 @@ cdef class Graph:
 
         for i in range(self.len_nodes):
             n = &self.nodes[i]
-            print("%d (x=%g, y=%g):\n"%(n.index, self.pos_x[n.index], self.pos_y[n.index]))
+            print("%d (x=%g, y=%g):"%(n.index, self.pos_x[n.index], self.pos_y[n.index]))
+            print("y = %f"%n.y)
             if n.pair != NULL and n.pair != <edge*> -1:
                 print("pair: %d"%n.pair.index)
             for j in range(n.n_edges):
@@ -187,13 +196,18 @@ cdef class Graph:
         print("Edges:")
         for i in range(self.len_edges):
             e = &self.edges[i]
-            print("(%d, %d -- %d) pnt=%d cyc=%d tags=%x"%
+            tagstring = ""
+            for tag, s in zip([TAG_WORK, TAG_BLOSSOM, TAG_INNER, TAG_OUTER, TAG_DOUBLE], "WBIOD"):
+                if e.tag & tag:
+                    tagstring += s
+            print("(%d, %d -- %d) pnt=%d cyc=%d slack=%f tags=%s"%
                 (e.index,
                  e.node_plus.index,
                  e.node_minus.index,
                  -1 if e.parent == NULL else e.parent.index,
                  -1 if e.cycle == NULL else e.cycle.index,
-                e.tag))
+                 e.slack,
+                 tagstring))
 
     def plot(self, ax=None):
         cdef edge *e
