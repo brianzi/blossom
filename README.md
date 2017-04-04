@@ -110,11 +110,11 @@ After some consideration, it might be worthwile to think about a more minimal
 data storage model; computations are often cheap.
 
 In this model, pointers always refer to vertices, the concept of "edges" 
-is not directly mirrored in the data model. Each pointer can take a special value NONE.
+is not mirrored as a structure in the data model. Each pointer can take a special value NONE.
 In fact, we store a list of vertices, and for each vertex we store a list of
 adjacent vertices, together with the weight of the corresponding edges,
-which is the input to the problem. 
-No vertex adjacency list is ever modified after creation. 
+which is the input to the problem (a sparse adjacency matrix)
+The vertex adjacency list is not modified after creation.
 This list is the input to the algorithm, but it might be extended by blossom
 pseudo vertices at runtime.
 
@@ -140,13 +140,13 @@ In this case, treeparent[v] has a secondary meaning:
 It contains a pointer to its blossom sibling, so that following treeparent
 inside a blossom is a circular linked list along the blossom. The direction is arbitrary.
 
-Furthermore, we maintain a monotonous function treeindex(v) = I[v] for each 
+Furthermore, we maintain a monotonous function treeindex(v) (or I(v) for short) for each 
 element in the tree, i.e. I(v) is decreasing towards the root. 
 We furthermore require I(v) reflects the parity of v in the tree, i.e. even for 
 outer nodes, odd for inner nodes. When adding new vertices to the tree, these properties
 are maintained by just assigning values of a running counter to each new added vertex.
 Besides identifying nodes as even or odd,
-this function should allows for easy finding of common ancestors, and thus efficient finding of blossoms.
+this function should allows for easy finding of common ancestors, and thus efficient finding of blossoms:
 
 ``` 
     while w!=v: 
@@ -156,20 +156,25 @@ this function should allows for easy finding of common ancestors, and thus effic
         w = parent(w)
       # v and w traverse the cycle, do something to them...  
 ```
-When contracting a blossom, we set its index to the index of the stem, preserving the decreasing property. 
+When contracting a blossom, set its index to the index of the stem
+(i.e. the vertex inserted in the blossom with the lowest I(v), which is the value of v and w 
+when the above loop terminates. This preserves the properties of I(v).
 
 When breaking a blossom, maintaining the tree property is harder, as 
 one vertex (the blossom) is expanded into a path.
-I have several ideas: a) destroy the tree after breaking, 
-rebuild from the same root.
-This will build the same tree, but with new I(v).
-b) When adding a blossom to the tree, increase the counter by the 
-number of vertices in the blossom, instead of 1. Requires keeping 
-track of blossom sizes.
-c) "decrease towards root". Expand the blossom. 
-Decrease I(v) on the whole path from the blossom to the root, 
-until there is "room" in I(v) space for the new path.
-Requires possibility of negative I(v).
+I have several ideas: 
+  a) destroy the tree after breaking, 
+  rebuild from the same root.
+  This will build the same tree, but with new I(v).
+  b) When adding a blossom to the tree, increase the counter by the 
+  number of vertices in the blossom, instead of 1. Requires keeping 
+  track of blossom sizes.
+  c) "decrease towards root". Expand the blossom. 
+  Decrease I(v) on the whole path from the blossom to the root, 
+  until there is "room" in I(v) space for the new path.
+  Requires possibility of negative I(v).
+The current implementation is the easiest one, a, and probably also the best idea.
+
         
 When considering new outer edges, it needs to be determined whether a vertex
 is in the tree already. If that is done by considering whether the tree
@@ -186,10 +191,10 @@ Making blossoms
 ---------------
 
 When making a new blossom B, we create a new (pseudo-)vertex in the
-vertex list. We then need to insert Delta(B) in the adjacency list,
+vertex list. We then need to set the adjacency list of B to Delta(B) (all vertices adjacent to B but not in B),
 and also add the corresponding reduced weight. 
-Note that we only ever take real vertices into the adjacency list,
-running up the blossomparent when required.
+Note that vertices in the adjacency list are always "real" vertices, not other blossoms 
+(the logic to take care of their destruction would be horrible).
 
 We construct the blossom in two steps: In round one, we
 use treeindex as described above to find all nodes in the 
@@ -235,9 +240,9 @@ Outer node scan
 ---------------
 
 The actual main work at each step is the "outer node scan".
-When the tree is not collapsed, an outer nodes is added created to the tree.
+When the tree is not being collapsed, in each step an outer nodes is added to the tree.
 As a consequence, new vertices are available, and their distance to 
-the root must be calculated and new events with the corresponding distances are added to the tree.
+the root must be calculated and new events with the corresponding distances are added to the queue.
 This is done in the following way:
 
 for a in the adjacency list of the new outer node b:
@@ -281,7 +286,7 @@ One might shortcut this because previously collapsed trees
 tend to leave big chunks of zero-distance nodes, but this is the general idea of having several trees.
 
 
-Idea: Lazy dual updates: Currently, after the collapse of each tree, 
+Idea: Lazy dual updates: Naively, after the collapse of each tree, 
 the dual is updated on the whole tree. Each node requires d(v,r), 
 which is calculated when the node is added to the availability queue, and
 d(o, n2) (see above) which is calculated at collapse time. 
@@ -290,4 +295,37 @@ a "tree serial number", and tag each node with the tree serial number it
 was last in. Then the dual update can be performed not at collapse time,
 but when it is considered next (when it is added to the 
 availability queue for the next time).
+
+
+Rounding errors
+---------------
+
+The distance calculation for the makeblossom step involves a divide by two. In fact,
+in the makeblossom step, the correct dual update to make the blossom tight can be half-integer.
+In principle, by a theorem, the problem can be solved in integers, but I have the impression that this requires additional 
+logic.
+
+The easy way out is to leave just a few fractional bits (i.e. input weights are always divisible by, say, k=4) 
+makes actual round-off errors exceedingly rare.
+In fact, it turns out that after generation of thousands of test cases with 20 vertices, 
+only one case (Regression test input reg5.dat) fails with k=2, but also that one succeeds with k=4.
+Failing here means returning an output with overtight edges (weight -1), but in fact the obtained matching is 
+still the correct one, as far as I can see.
+I consider this a reasonable trade-off and consider the problem solved for all practical purposes if we set k=4.
+
+Matching to the boundary
+------------------------
+
+I think the best way to represent possible matching to the boundary 
+(one could also say, leaving a vertex unmatched with a certain weight)
+Is to represent it using loops. (I think the standard way is to double the graph...)
+
+This leads to the following possible options:
+
+  a) the next available outer edge is a loop  (of an outer vertex v to itself) (i.e. leads to the boundary): 
+    - collapse the tree, making this edge tight and paired. We have special rule here where the weight on that edge is only reduced once by the dual of v 
+      (even though it is incident with v twice)
+  b) the next available vertex v is already paired to itself:
+    - do not do a node scan. It can just be ignored.
+
 
