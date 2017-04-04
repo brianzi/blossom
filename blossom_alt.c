@@ -44,7 +44,6 @@ unsigned int a, b, c; // pointer registers
 unsigned int d; // dual value calculation register
 unsigned int i; // register to iterate over adjacency list
 
-
 void grow_tree() {
     int d2;
 
