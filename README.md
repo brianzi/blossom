@@ -8,7 +8,7 @@ We associate with each edge the following information:
   - x: Whether this edge is in the matching (=primal variable), is 0 or 1
   - node plus and node minus. The two nodes connected by this edge. Initially, two vertices.
   - parent edge. When the edge is in the alternating tree, this edge is the edge one step closer to the root. 
-    If x(e)=1, x(parent(e))=0 and vice versa, by the defnition of the alternating tree.
+    If x(e)=1, x(parent(e))=0 and vice versa, by the definition of the alternating tree.
 
 
 We associate with each node the following information:
